@@ -57,7 +57,7 @@ async function createPage({ titulo, detalles, estado }) {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({
-      parent: { data_source_id: DB_ID },
+      parent: { database_id: DB_ID },
       properties: {
         Titulo: { title: [{ text: { content: titulo } }] },
         Detalles: { rich_text: [{ text: { content: detalles } }] },
