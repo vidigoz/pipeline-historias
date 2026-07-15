@@ -3,7 +3,7 @@
   publish = "public"
 
 [functions]
-  node_bundler = "esbuild"
+  node_bundler = "zisi"
 
 # El dashboard vive en public/index.html y se sirve en la raíz "/".
 # Los endpoints siguen resolviéndose en /.netlify/functions/<nombre>.
