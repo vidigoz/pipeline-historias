@@ -251,14 +251,18 @@
 
     // Estados que esperan una acción manual tuya (no hay "siguiente paso" auto)
     const ESPERA_MANUAL = {
-      Estructura: 'Esperando tu aprobación (cambia a "Proceso")',
       Revision: 'Pipeline terminado (revisión manual)',
     };
-    // "Proceso" es el único botón manual restante: dispara la cadena
-    // Redactor -> Verificador -> Cazador de IA -> Editor Final de un jalón,
-    // hasta dejarlo en "Revision". "Semilla" ya no aparece aquí porque el
-    // Buscador de Semillas encadena el Estructurista solo.
-    const TIENE_PASO = ['Proceso'];
+    // "Estructura" es el único botón manual restante: al aprobar, marca
+    // Proceso en Notion y dispara la cadena Redactor -> Verificador ->
+    // Cazador de IA -> Editor Final de un jalón, hasta dejarlo en "Revision".
+    // "Semilla" no aparece aquí porque el Buscador de Semillas encadena el
+    // Estructurista solo.
+    const TIENE_PASO = ['Estructura'];
+    // Texto del botón según el estado (default: "Ejecutar siguiente paso")
+    const TEXTO_BOTON = {
+      Estructura: '✓ Aprobar',
+    };
     // Solo mostramos historias en estos estados en el dashboard. Redactado/
     // Verificado/Pulido son transitorios (deberían durar segundos dentro de
     // la cadena), pero se incluyen por si una corrida falla a medias.
@@ -412,7 +416,7 @@
 
       if (TIENE_PASO.includes(h.estado)) {
         const b = document.createElement('button');
-        b.textContent = 'Ejecutar siguiente paso';
+        b.textContent = TEXTO_BOTON[h.estado] || 'Ejecutar siguiente paso';
         b.style.fontSize = '0.82rem';
         b.addEventListener('click', () => ejecutarPaso(h, b));
         wrap.appendChild(b);
@@ -431,7 +435,7 @@
     async function ejecutarPaso(h, btn) {
       btn.disabled = true;
       const orig = btn.textContent;
-      btn.textContent = 'Ejecutando…';
+      btn.textContent = 'Procesando… (puede tardar)';
       try {
         const r = await api('ejecutar-paso', { page_id: h.id, estado: h.estado });
         banner(`${r.agente} corrió sobre "${h.titulo}". Nuevo estado: ${r.nuevoEstado}.`, 'ok');
