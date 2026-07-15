@@ -1,30 +1,34 @@
 // netlify/functions/ejecutar-paso.js
 //
-// Dispara manualmente el agente que corresponde al Estado actual de una
-// historia, pasándole el page_id. Útil para probar un agente sin depender del
-// webhook de Notion.
+// Dispara desde el dashboard el siguiente tramo del pipeline según el Estado
+// actual de la historia. Solo hay dos paradas reales que requieren tu
+// intervención: "Estructura" (apruebas y cambias a mano a "Proceso") y
+// "Revision" (revisas, creas la imagen y cambias a mano a "Listo"). El tramo
+// "Semilla" -> "Estructura" ya corre solo desde buscador-semillas.js.
 //
-// El mapa respeta la cadena real del pipeline, incluyendo el hueco de
-// aprobación manual: el estructurista deja el estado en "Estructura", pero
-// Victor lo revisa y lo cambia a "Proceso" a mano antes de que corra el
-// redactor. Por eso "Estructura" NO dispara nada automáticamente.
-//
-// Body esperado: { "page_id": "...", "estado": "Semilla" }
+// Body esperado: { "page_id": "...", "estado": "Proceso" }
 
 const { requireAuth } = require('./lib/auth');
-const { ejecutarEstructurista } = require('./estructurista');
 const { ejecutarRedactor } = require('./redactor');
 const { ejecutarVerificador } = require('./verificador-historico');
 const { ejecutarCazador } = require('./cazador-ia');
 const { ejecutarEditorFinal } = require('./editor-final');
 
+// Desde "Proceso" (tu aprobación de la estructura) el pipeline corre solo
+// hasta "Revision": Redactor -> Verificador -> Cazador de IA -> Editor Final,
+// sin pararse a pedir click entre cada uno.
+async function ejecutarHastaRevision(pageId) {
+  await ejecutarRedactor(pageId);
+  await ejecutarVerificador(pageId);
+  await ejecutarCazador(pageId);
+  await ejecutarEditorFinal(pageId);
+}
+
 // Estado actual de la historia -> { agente a correr, deja el estado en }
+// "Semilla" no aparece aquí: el Buscador de Semillas ya encadena el
+// Estructurista solo y deja la historia en "Estructura".
 const PASOS = {
-  Semilla: { fn: ejecutarEstructurista, agente: 'Estructurista', dejaEn: 'Estructura' },
-  Proceso: { fn: ejecutarRedactor, agente: 'Redactor', dejaEn: 'Redactado' },
-  Redactado: { fn: ejecutarVerificador, agente: 'Verificador Histórico', dejaEn: 'Verificado' },
-  Verificado: { fn: ejecutarCazador, agente: 'Cazador de IA', dejaEn: 'Pulido' },
-  Pulido: { fn: ejecutarEditorFinal, agente: 'Editor Final', dejaEn: 'Revision' },
+  Proceso: { fn: ejecutarHastaRevision, agente: 'Redactor → Verificador → Cazador de IA → Editor Final', dejaEn: 'Revision' },
 };
 
 // Estados que existen pero NO disparan nada: esperan una acción manual tuya.

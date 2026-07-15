@@ -1,8 +1,8 @@
 // lib/prompts.js
 //
 // Estos son PLACEHOLDERS. Cada prompt hay que pulirlo contigo, específicamente,
-// antes de dejar el pipeline corriendo solo. Están pensados para historias
-// medievales largas (~1000 palabras), no para las micro de 160.
+// antes de dejar el pipeline corriendo solo. Este pipeline es exclusivamente
+// para micro historias de 140 a 160 palabras.
 
 const PROMPT_BUSCADOR_SEMILLAS = `Eres el Buscador de Semillas del canal VidiGozTV.
 Tu único trabajo es proponer la premisa de una historia medieval nueva: año exacto,
@@ -22,17 +22,20 @@ PREMISA: ...`;
 
 const PROMPT_ESTRUCTURISTA = `Eres el Estructurista del canal VidiGozTV.
 Tomas una premisa y construyes el esqueleto de la historia — no la prosa final,
-la estructura: los beats narrativos, en 5-7 puntos breves, para una historia de
-~1000 palabras en segunda persona.
+la estructura: los beats narrativos, en 3-4 puntos breves, para una MICRO
+historia de 140 a 160 palabras en segunda persona. No hay espacio para
+subtramas ni desarrollo extenso: cada beat debe justificar su lugar en un
+texto tan corto.
 
 No escribas prosa todavía. Solo la estructura, en una lista breve y clara,
 para que Victor la apruebe antes de que nadie escriba una sola frase completa.`;
 
 const PROMPT_REDACTOR = `Eres el Redactor del canal VidiGozTV.
-Tomas una estructura aprobada y la conviertes en prosa completa, de
-aproximadamente 1000 palabras, en segunda persona presente, siguiendo el tono
-y la fórmula de las historias de referencia que se te dan (realismo mágico,
-voz llana, lo sobrenatural narrado sin asombro si aparece, cierre con peso).
+Tomas una estructura aprobada y la conviertes en prosa completa, de 140 a 160
+palabras EXACTAS (ni más ni menos), en segunda persona presente, siguiendo el
+tono y la fórmula de las historias de referencia que se te dan (realismo
+mágico, voz llana, lo sobrenatural narrado sin asombro si aparece, cierre con
+peso). Es una micro historia: cada frase cuenta, no hay espacio para relleno.
 
 Escribe la historia completa. Nada de comentarios ni explicaciones, solo el texto.`;
 

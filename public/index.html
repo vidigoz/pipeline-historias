@@ -206,7 +206,7 @@
       <!-- 1. Generar semilla -->
       <section>
         <button class="primary big" id="gen-btn">✨ Generar historia semilla ahora</button>
-        <p class="hint" id="gen-hint">Dispara el Buscador de Semillas sin esperar al cron semanal. Crea 5 premisas nuevas.</p>
+        <p class="hint" id="gen-hint">Dispara el Buscador de Semillas sin esperar al cron diario. Crea la premisa, la manda al Estructurista y la deja en "Estructura" para tu revisión.</p>
       </section>
 
       <!-- 3. Panel de historias -->
@@ -254,10 +254,15 @@
       Estructura: 'Esperando tu aprobación (cambia a "Proceso")',
       Revision: 'Pipeline terminado (revisión manual)',
     };
-    // Estados que SÍ tienen un siguiente agente automático
-    const TIENE_PASO = ['Semilla', 'Proceso', 'Redactado', 'Verificado', 'Pulido'];
-    // Solo mostramos historias en estos estados en el dashboard
-    const ESTADOS_VISIBLES = ['Semilla', 'Estructura', 'Revision'];
+    // "Proceso" es el único botón manual restante: dispara la cadena
+    // Redactor -> Verificador -> Cazador de IA -> Editor Final de un jalón,
+    // hasta dejarlo en "Revision". "Semilla" ya no aparece aquí porque el
+    // Buscador de Semillas encadena el Estructurista solo.
+    const TIENE_PASO = ['Proceso'];
+    // Solo mostramos historias en estos estados en el dashboard. Redactado/
+    // Verificado/Pulido son transitorios (deberían durar segundos dentro de
+    // la cadena), pero se incluyen por si una corrida falla a medias.
+    const ESTADOS_VISIBLES = ['Estructura', 'Redactado', 'Verificado', 'Pulido', 'Revision'];
 
     // ---- Helper de fetch autenticado ----
     async function api(path, body) {
@@ -363,7 +368,7 @@
         body.innerHTML = '';
         const historias = r.historias.filter(h => ESTADOS_VISIBLES.includes(h.estado));
         if (!historias.length) {
-          loading.textContent = 'No hay historias en Estructura o Revisión.';
+          loading.textContent = 'No hay historias esperando tu revisión.';
           return;
         }
         for (const h of historias) {
