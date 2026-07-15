@@ -88,4 +88,26 @@ async function getReferenciasProgramado(campo = 'Historia', n = 4) {
     .filter(Boolean);
 }
 
-module.exports = { getPage, updatePage, createPage, getReferenciasProgramado, plain };
+// Lista historias de vidiclip_db para el dashboard: título, estado, fecha de
+// creación (created_time nativo de Notion, no requiere propiedad extra) y el id.
+async function listarHistorias(n = 50) {
+  const res = await fetch(`https://api.notion.com/v1/databases/${DB_ID}/query`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      sorts: [{ timestamp: 'created_time', direction: 'descending' }],
+      page_size: n,
+    }),
+  });
+  if (!res.ok) throw new Error(`Notion listarHistorias falló: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  return data.results.map((page) => ({
+    id: page.id,
+    url: page.url,
+    titulo: plain(page.properties['Titulo']) || '(sin título)',
+    estado: page.properties['Estado']?.status?.name || '(sin estado)',
+    creado: page.created_time,
+  }));
+}
+
+module.exports = { getPage, updatePage, createPage, getReferenciasProgramado, listarHistorias, plain };

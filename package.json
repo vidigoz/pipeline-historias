@@ -1,0 +1,9 @@
+{
+  "name": "pipeline-historias",
+  "version": "1.0.0",
+  "description": "Pipeline editorial de 6 agentes de IA (Netlify Functions) para historias medievales de VidiGozTV",
+  "private": true,
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}

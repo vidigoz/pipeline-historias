@@ -60,11 +60,38 @@ cierre pegue. Usa las historias de referencia como benchmark de calidad final.
 
 Devuelve solo el texto final, listo para que Victor lo revise y apruebe.`;
 
-module.exports = {
+// Mapa nombre -> texto por defecto (el hardcodeado de arriba).
+// Es la única fuente de verdad de los defaults; el dashboard, get-prompts y
+// getPrompt() se apoyan todos en este objeto.
+const DEFAULTS = {
   PROMPT_BUSCADOR_SEMILLAS,
   PROMPT_ESTRUCTURISTA,
   PROMPT_REDACTOR,
   PROMPT_VERIFICADOR_HISTORICO,
   PROMPT_CAZADOR_IA,
   PROMPT_EDITOR_FINAL,
+};
+
+// getPrompt(nombre): lee el prompt EFECTIVO. Primero intenta Blobs (versión
+// editada desde el dashboard); si no hay nada guardado o Blobs falla, cae al
+// default hardcodeado. Es la función que deben usar los agentes.
+async function getPrompt(nombre) {
+  const def = DEFAULTS[nombre];
+  if (def === undefined) throw new Error(`Prompt desconocido: ${nombre}`);
+  try {
+    // Import perezoso para no acoplar prompts.js a Blobs si nunca se llama.
+    const { readPrompt } = require('./blobs');
+    const guardado = await readPrompt(nombre);
+    return guardado != null && guardado !== '' ? guardado : def;
+  } catch (err) {
+    // Si Blobs no está disponible, seguimos funcionando con el default.
+    console.error(`getPrompt(${nombre}) cayó al default:`, err.message);
+    return def;
+  }
+}
+
+module.exports = {
+  ...DEFAULTS,
+  DEFAULTS,
+  getPrompt,
 };
