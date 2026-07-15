@@ -12,6 +12,7 @@ async function llamarClaude(systemPrompt, userMessage, maxTokens = 1500) {
     body: JSON.stringify({
       model: 'claude-sonnet-5',
       max_tokens: maxTokens,
+      thinking: { type: 'disabled' },
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     }),
