@@ -12,7 +12,7 @@ const { createPage, getReferenciasProgramado } = require('./lib/notion');
 const { llamarClaude, bloqueEjemplos } = require('./lib/claude');
 const { getPrompt } = require('./lib/prompts');
 
-const HISTORIAS_POR_CORRIDA = 5; // tu patrón actual de batch semanal
+const HISTORIAS_POR_CORRIDA = 1; // bajado de 5 para no exceder el timeout de 10s de Netlify Functions en el plan Personal
 
 // Lógica reutilizable: genera N semillas nuevas y las crea en vidiclip_db.
 // Devuelve el array de { titulo, id } de las historias creadas.
