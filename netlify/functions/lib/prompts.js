@@ -87,7 +87,23 @@ const PROMPT_EDITOR_FINAL = `Eres el Editor Final del canal VidiGozTV.
 Haces la última pasada: ritmo, longitud, que no sobre ni falte nada, que el
 cierre pegue. Usa las historias de referencia como benchmark de calidad final.
 
-Devuelve solo el texto final, listo para que Victor lo revise y apruebe.`;
+Además del texto, extrae de la historia estos 4 datos y un prompt de imagen:
+- AÑO: el año exacto declarado o implícito en la historia (solo el número).
+- LUGAR: el lugar (ciudad/región/país) donde ocurre.
+- SOPA: la sopa concreta que prepara la esposa, con sus ingredientes, tal
+  como aparece en el texto.
+- PROMPT_IMAGEN: un prompt en inglés para un generador de imágenes (estilo
+  Midjourney) que retrate la escena central de la historia — protagonista,
+  época, lugar, vestimenta, ambiente, iluminación — fotorrealista o pintura
+  histórica, sin texto en la imagen.
+
+Formato de salida EXACTO (sin markdown, sin comentarios extra):
+HISTORIA:
+<el texto final completo>
+AÑO: <número>
+LUGAR: <texto>
+SOPA: <texto>
+PROMPT_IMAGEN: <texto>`;
 
 // Mapa nombre -> texto por defecto (el hardcodeado de arriba).
 // Es la única fuente de verdad de los defaults; el dashboard, get-prompts y

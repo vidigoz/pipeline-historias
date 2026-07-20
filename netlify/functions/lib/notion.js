@@ -30,7 +30,7 @@ async function getPage(pageId) {
 }
 
 // Actualiza propiedades de texto + Estado de una página
-async function updatePage(pageId, { historia, detalles, estado }) {
+async function updatePage(pageId, { historia, detalles, estado, sopa, lugar, anio, promptImagen }) {
   const properties = {};
   if (historia !== undefined) {
     properties['Historia'] = { rich_text: [{ text: { content: historia.slice(0, 2000) } }] };
@@ -40,6 +40,18 @@ async function updatePage(pageId, { historia, detalles, estado }) {
   }
   if (estado !== undefined) {
     properties['Estado'] = { status: { name: estado } };
+  }
+  if (sopa !== undefined) {
+    properties['Sopa'] = { rich_text: [{ text: { content: sopa.slice(0, 2000) } }] };
+  }
+  if (lugar !== undefined) {
+    properties['Lugar'] = { rich_text: [{ text: { content: lugar.slice(0, 2000) } }] };
+  }
+  if (anio !== undefined) {
+    properties['Año'] = { number: anio };
+  }
+  if (promptImagen !== undefined) {
+    properties['Prompt de imagen'] = { rich_text: [{ text: { content: promptImagen.slice(0, 2000) } }] };
   }
 
   const res = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
