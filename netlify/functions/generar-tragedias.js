@@ -128,11 +128,57 @@ sopa (ej. "sopa de lentejas con romero y vinagre").
 En el campo "detalles" escribe la ley violada + una descripción breve de
 cómo la viola el personaje.`;
 
-// Parsea la respuesta de Claude: un array JSON de 3 objetos historia.
+// Claude a veces devuelve saltos de línea/tabs crudos (sin escapar) dentro
+// del texto de la historia, lo que rompe JSON.parse. Recorre el string
+// carácter por carácter y escapa esos controles SOLO cuando están dentro de
+// un string JSON (fuera de un string se dejan intactos, son el formato del
+// propio JSON).
+function repararControlesEnStrings(jsonTxt) {
+  let out = '';
+  let dentroDeString = false;
+  let escapando = false;
+  for (const ch of jsonTxt) {
+    if (escapando) {
+      out += ch;
+      escapando = false;
+      continue;
+    }
+    if (ch === '\\' && dentroDeString) {
+      out += ch;
+      escapando = true;
+      continue;
+    }
+    if (ch === '"') {
+      dentroDeString = !dentroDeString;
+      out += ch;
+      continue;
+    }
+    if (dentroDeString && ch === '\n') { out += '\\n'; continue; }
+    if (dentroDeString && ch === '\r') { out += '\\r'; continue; }
+    if (dentroDeString && ch === '\t') { out += '\\t'; continue; }
+    out += ch;
+  }
+  return out;
+}
+
+// Parsea la respuesta de Claude: un array JSON de 3 objetos historia. Si el
+// parseo directo falla (Claude no escapó bien saltos de línea/tabs dentro de
+// un string), reintenta una vez con el texto reparado antes de rendirse.
 function parseHistorias(salida) {
   const jsonTxt = (salida.match(/\[[\s\S]*\]/) || [])[0];
   if (!jsonTxt) throw new Error('Claude no devolvió un array JSON reconocible.');
-  const arr = JSON.parse(jsonTxt);
+
+  let arr;
+  try {
+    arr = JSON.parse(jsonTxt);
+  } catch (err) {
+    try {
+      arr = JSON.parse(repararControlesEnStrings(jsonTxt));
+    } catch (_) {
+      throw new Error(`Claude devolvió JSON inválido: ${err.message}`);
+    }
+  }
+
   if (!Array.isArray(arr) || !arr.length) throw new Error('El JSON no contiene historias.');
   return arr;
 }
@@ -147,7 +193,13 @@ Genera 3 historias siguiendo exactamente las reglas del system prompt. No
 repitas ley ni oficio entre las 3. Responde ÚNICAMENTE con un array JSON
 válido, sin texto adicional ni markdown, con este esquema exacto por
 historia:
-[{"titulo":"","historia":"","promptImagen":"","oficio":"","anio":1234,"lugar":"","sopa":"","detalles":""}]`;
+[{"titulo":"","historia":"","promptImagen":"","oficio":"","anio":1234,"lugar":"","sopa":"","detalles":""}]
+
+Importante sobre el formato JSON: el campo "historia" es texto largo en
+prosa — escápalo correctamente como un string JSON de una sola línea,
+usando \\n para cualquier salto de línea y \\" para comillas dobles
+internas. No devuelvas saltos de línea reales (sin escapar) dentro de
+ningún valor de texto.`;
 
   const salida = await llamarClaude(SYSTEM_PROMPT, userMsg, 4000);
   const historias = parseHistorias(salida);
