@@ -1,11 +1,16 @@
 // netlify/functions/ejecutar-paso.js
 //
 // Dispara desde el dashboard el siguiente tramo del pipeline según el Estado
-// actual de la historia. Solo "Revision" es una parada real sin botón
-// (revisas, creas la imagen y cambias a mano a "Listo"). El tramo
-// "Semilla" -> "Estructura" ya corre solo desde buscador-semillas.js. El botón
-// "Aprobar" en "Estructura" marca el Estado como "Proceso" en Notion y
-// encadena el resto del pipeline en la misma llamada.
+// actual de la historia. Cada click corre UN SOLO agente (una sola llamada a
+// Claude) para no acercarse al timeout de 10s de Netlify Functions —
+// encadenar los 4 agentes (Redactor -> Verificador -> Cazador -> Editor
+// Final) en una misma invocación causaba 504 y dejaba la historia varada a
+// mitad de camino, sin botón para reintentar. Ahora cada estado transitorio
+// tiene su propio botón "Continuar" en el dashboard.
+//
+// Solo "Revision" es una parada real sin botón (revisas, creas la imagen y
+// cambias a mano a "Listo"). El tramo "Semilla" -> "Estructura" ya corre solo
+// desde buscador-semillas.js.
 //
 // Body esperado: { "page_id": "...", "estado": "Estructura" }
 
@@ -16,27 +21,21 @@ const { ejecutarVerificador } = require('./verificador-historico');
 const { ejecutarCazador } = require('./cazador-ia');
 const { ejecutarEditorFinal } = require('./editor-final');
 
-// Corre el resto del pipeline hasta "Revision": Redactor -> Verificador ->
-// Cazador de IA -> Editor Final, sin pararse a pedir click entre cada uno.
-async function ejecutarHastaRevision(pageId) {
-  await ejecutarRedactor(pageId);
-  await ejecutarVerificador(pageId);
-  await ejecutarCazador(pageId);
-  await ejecutarEditorFinal(pageId);
-}
-
 // "Aprobar" en Estructura: marca el Estado como "Proceso" (tu aprobación
-// queda registrada en Notion) y de inmediato sigue con el resto del pipeline.
+// queda registrada en Notion) y corre el primer agente de la cadena.
 async function aprobarYContinuar(pageId) {
   await updatePage(pageId, { estado: 'Proceso' });
-  await ejecutarHastaRevision(pageId);
+  await ejecutarRedactor(pageId);
 }
 
 // Estado actual de la historia -> { agente a correr, deja el estado en }
 // "Semilla" no aparece aquí: el Buscador de Semillas ya encadena el
 // Estructurista solo y deja la historia en "Estructura".
 const PASOS = {
-  Estructura: { fn: aprobarYContinuar, agente: 'Redactor → Verificador → Cazador de IA → Editor Final', dejaEn: 'Revision' },
+  Estructura: { fn: aprobarYContinuar, agente: 'Redactor', dejaEn: 'Redactado' },
+  Redactado: { fn: ejecutarVerificador, agente: 'Verificador Histórico', dejaEn: 'Verificado' },
+  Verificado: { fn: ejecutarCazador, agente: 'Cazador de IA', dejaEn: 'Pulido' },
+  Pulido: { fn: ejecutarEditorFinal, agente: 'Editor Final', dejaEn: 'Revision' },
 };
 
 // Estados que existen pero NO disparan nada: esperan una acción manual tuya.

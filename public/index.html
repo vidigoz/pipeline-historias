@@ -254,15 +254,18 @@
     const ESPERA_MANUAL = {
       Revision: 'Pipeline terminado (revisión manual)',
     };
-    // "Estructura" es el único botón manual restante: al aprobar, marca
-    // Proceso en Notion y dispara la cadena Redactor -> Verificador ->
-    // Cazador de IA -> Editor Final de un jalón, hasta dejarlo en "Revision".
-    // "Semilla" no aparece aquí porque el Buscador de Semillas encadena el
-    // Estructurista solo.
-    const TIENE_PASO = ['Estructura'];
+    // Cada estado transitorio corre UN solo agente por click (evita el 504 de
+    // encadenar los 4 en una sola llamada). "Estructura" aprueba y arranca el
+    // Redactor; los siguientes 3 estados avanzan con "Continuar" hasta dejar
+    // la historia en "Revision". "Semilla" no aparece aquí porque el Buscador
+    // de Semillas encadena el Estructurista solo.
+    const TIENE_PASO = ['Estructura', 'Redactado', 'Verificado', 'Pulido'];
     // Texto del botón según el estado (default: "Ejecutar siguiente paso")
     const TEXTO_BOTON = {
       Estructura: '✓ Aprobar',
+      Redactado: '→ Continuar',
+      Verificado: '→ Continuar',
+      Pulido: '→ Continuar',
     };
     // Solo mostramos historias en estos estados en el dashboard. Redactado/
     // Verificado/Pulido son transitorios (deberían durar segundos dentro de
