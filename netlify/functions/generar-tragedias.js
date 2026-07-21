@@ -1,11 +1,15 @@
 // netlify/functions/generar-tragedias.js
 //
-// Agente autocontenido: en una sola llamada a Claude genera 5 historias
+// Agente autocontenido: en una sola llamada a Claude genera 3 historias
 // medievales de tipo TRAGEDIA (spec completa en
 // agentes/agente_tragedias_medievales_v1.md) y las publica directo en
 // vidiclip_db con todos los campos llenos, en Estado "Revision". No hay
 // pasos intermedios ni cascada — de aquí en más el flujo es 100% manual
 // (el usuario revisa, sube imagen, pasa a "Listo").
+//
+// Bajado de 5 a 3 historias por corrida: generar 5 historias completas en
+// una sola llamada a Claude superaba el límite de 10s de Netlify Functions
+// (plan Personal, sin Background Functions) y daba 504.
 
 const { requireAuth } = require('./lib/auth');
 const { leerContenidoPagina, crearHistoriaCompleta } = require('./lib/notion');
@@ -17,7 +21,7 @@ const PAGE_ID_FUENTE = '31cd33622b91805eb346e9d2066efa72';
 const CATEGORY = 'Tragedia';
 
 const SYSTEM_PROMPT = `Eres el Agente de Tragedias Medievales del canal VidiGozTV — Leyes de Greene v1.
-Generas 5 historias medievales de tipo TRAGEDIA donde el personaje principal
+Generas 3 historias medievales de tipo TRAGEDIA donde el personaje principal
 viola una ley del poder o la naturaleza humana y sufre consecuencias fatales
 o devastadoras.
 
@@ -34,8 +38,8 @@ los patrones antes de escribir:
 
 ## LEYES A VIOLAR
 
-Elige una ley distinta para cada una de las 5 historias. No repitas leyes
-entre las 5.
+Elige una ley distinta para cada una de las 3 historias. No repitas leyes
+entre las 3.
 
 Las 48 Leyes del Poder — Robert Greene:
 Ley 1: Nunca opaques al maestro
@@ -64,7 +68,7 @@ La Ley de la Actitud: tu carácter es tu destino
 
 ## BANCO DE OFICIOS MEDIEVALES
 
-Usa 5 oficios distintos, uno por historia.
+Usa 3 oficios distintos, uno por historia.
 
 Alimentación: panadero, molinero, carnicero, cervecero, quesero, salador de
 carnes, cocinero de abadía.
@@ -124,7 +128,7 @@ sopa (ej. "sopa de lentejas con romero y vinagre").
 En el campo "detalles" escribe la ley violada + una descripción breve de
 cómo la viola el personaje.`;
 
-// Parsea la respuesta de Claude: un array JSON de 5 objetos historia.
+// Parsea la respuesta de Claude: un array JSON de 3 objetos historia.
 function parseHistorias(salida) {
   const jsonTxt = (salida.match(/\[[\s\S]*\]/) || [])[0];
   if (!jsonTxt) throw new Error('Claude no devolvió un array JSON reconocible.');
@@ -139,13 +143,13 @@ async function generarTragedias() {
   const userMsg = `Fuente de inspiración (Top 10 historia, para calibrar tono y patrones narrativos):
 ${inspiracion}
 
-Genera 5 historias siguiendo exactamente las reglas del system prompt. No
-repitas ley ni oficio entre las 5. Responde ÚNICAMENTE con un array JSON
+Genera 3 historias siguiendo exactamente las reglas del system prompt. No
+repitas ley ni oficio entre las 3. Responde ÚNICAMENTE con un array JSON
 válido, sin texto adicional ni markdown, con este esquema exacto por
 historia:
 [{"titulo":"","historia":"","promptImagen":"","oficio":"","anio":1234,"lugar":"","sopa":"","detalles":""}]`;
 
-  const salida = await llamarClaude(SYSTEM_PROMPT, userMsg, 6000);
+  const salida = await llamarClaude(SYSTEM_PROMPT, userMsg, 4000);
   const historias = parseHistorias(salida);
 
   const creadas = [];

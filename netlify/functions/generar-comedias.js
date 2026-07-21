@@ -1,11 +1,15 @@
 // netlify/functions/generar-comedias.js
 //
-// Agente autocontenido: en una sola llamada a Claude genera 5 historias
+// Agente autocontenido: en una sola llamada a Claude genera 3 historias
 // medievales de tipo COMEDIA (spec completa en
 // agentes/agente_historias_medievales_v3.md) y las publica directo en
 // vidiclip_db con todos los campos llenos, en Estado "Revision". No hay
 // pasos intermedios ni cascada — de aquí en más el flujo es 100% manual
 // (el usuario revisa, sube imagen, pasa a "Listo").
+//
+// Bajado de 5 a 3 historias por corrida: generar 5 historias completas en
+// una sola llamada a Claude superaba el límite de 10s de Netlify Functions
+// (plan Personal, sin Background Functions) y daba 504.
 
 const { requireAuth } = require('./lib/auth');
 const { leerContenidoPagina, crearHistoriaCompleta } = require('./lib/notion');
@@ -17,7 +21,7 @@ const PAGE_ID_FUENTE = '31cd33622b91805eb346e9d2066efa72';
 const CATEGORY = 'Comedia';
 
 const SYSTEM_PROMPT = `Eres el Agente de Historias Medievales del canal VidiGozTV — v3 (Comedias).
-Generas 5 historias medievales de tipo COMEDIA, con final positivo o
+Generas 3 historias medievales de tipo COMEDIA, con final positivo o
 irónico, nunca trágico.
 
 ## FUENTE DE INSPIRACIÓN
@@ -31,11 +35,11 @@ Analiza las historias y extrae patrones repetidos, por ejemplo:
   bendecidas
 
 Antes de escribir: lee las historias, identifica los patrones que más se
-repiten, y úsalos como guías creativas para las 5 historias nuevas.
+repiten, y úsalos como guías creativas para las 3 historias nuevas.
 
 ## REGLAS PARA VARIAR LOS OFICIOS (MUY IMPORTANTE)
 
-- Usa 5 oficios distintos, uno por historia. No los repitas entre sí.
+- Usa 3 oficios distintos, uno por historia. No los repitas entre sí.
 - Prefiere oficios menos obvios además de los típicos (verdugo, médico,
   inquisidor, etc.).
 - El oficio debe estar completamente integrado en la historia: herramientas,
@@ -94,7 +98,7 @@ con tocino").
 
 Deja el campo "detalles" como cadena vacía ("").`;
 
-// Parsea la respuesta de Claude: un array JSON de 5 objetos historia.
+// Parsea la respuesta de Claude: un array JSON de 3 objetos historia.
 function parseHistorias(salida) {
   const jsonTxt = (salida.match(/\[[\s\S]*\]/) || [])[0];
   if (!jsonTxt) throw new Error('Claude no devolvió un array JSON reconocible.');
@@ -109,12 +113,12 @@ async function generarComedias() {
   const userMsg = `Fuente de inspiración (Top 10 historia, para calibrar tono y patrones narrativos):
 ${inspiracion}
 
-Genera 5 historias siguiendo exactamente las reglas del system prompt. No
-repitas oficio entre las 5. Responde ÚNICAMENTE con un array JSON válido,
+Genera 3 historias siguiendo exactamente las reglas del system prompt. No
+repitas oficio entre las 3. Responde ÚNICAMENTE con un array JSON válido,
 sin texto adicional ni markdown, con este esquema exacto por historia:
 [{"titulo":"","historia":"","promptImagen":"","oficio":"","anio":1234,"lugar":"","sopa":"","detalles":""}]`;
 
-  const salida = await llamarClaude(SYSTEM_PROMPT, userMsg, 6000);
+  const salida = await llamarClaude(SYSTEM_PROMPT, userMsg, 4000);
   const historias = parseHistorias(salida);
 
   const creadas = [];
