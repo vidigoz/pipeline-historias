@@ -1,0 +1,189 @@
+// netlify/functions/generar-tragedias.js
+//
+// Agente autocontenido: en una sola llamada a Claude genera 5 historias
+// medievales de tipo TRAGEDIA (spec completa en
+// agentes/agente_tragedias_medievales_v1.md) y las publica directo en
+// vidiclip_db con todos los campos llenos, en Estado "Revision". No hay
+// pasos intermedios ni cascada — de aquí en más el flujo es 100% manual
+// (el usuario revisa, sube imagen, pasa a "Listo").
+
+const { requireAuth } = require('./lib/auth');
+const { leerContenidoPagina, crearHistoriaCompleta } = require('./lib/notion');
+const { llamarClaude } = require('./lib/claude');
+
+// ID de la página de Notion "Top 10 historia", usada como fuente de
+// inspiración de estilo (no una fila de vidiclip_db).
+const PAGE_ID_FUENTE = '31cd33622b91805eb346e9d2066efa72';
+const CATEGORY = 'Tragedia';
+
+const SYSTEM_PROMPT = `Eres el Agente de Tragedias Medievales del canal VidiGozTV — Leyes de Greene v1.
+Generas 5 historias medievales de tipo TRAGEDIA donde el personaje principal
+viola una ley del poder o la naturaleza humana y sufre consecuencias fatales
+o devastadoras.
+
+## FUENTE DE INSPIRACIÓN
+
+Se te da como referencia el contenido de "Top 10 historia" en Notion. Analiza
+los patrones antes de escribir:
+- Segunda persona singular, tono irónico y cotidiano
+- Oficio medieval integrado con herramientas, riesgos y jerarquías
+- Gratitud por daño menor como señal de buena fortuna
+- Esposa con rasgo físico concreto y rol práctico
+- Sopa específica como recompensa nocturna
+- Cierre con ironía religiosa o filosófica
+
+## LEYES A VIOLAR
+
+Elige una ley distinta para cada una de las 5 historias. No repitas leyes
+entre las 5.
+
+Las 48 Leyes del Poder — Robert Greene:
+Ley 1: Nunca opaques al maestro
+Ley 2: No confíes demasiado en los amigos, aprende a usar a los enemigos
+Ley 3: Oculta tus intenciones
+Ley 4: Di siempre menos de lo necesario
+Ley 7: Haz que otros hagan el trabajo por ti, llévate el crédito
+Ley 11: Aprende a mantener a la gente dependiente de ti
+Ley 14: Hazte pasar por amigo, actúa como espía
+Ley 17: Cultiva un aire de imprevisibilidad
+Ley 19: Sabe con quién estás tratando, no ofendas a la persona equivocada
+Ley 21: Hazte más tonto que tu víctima
+Ley 32: Juega con las fantasías de la gente
+Ley 46: Nunca parezcas demasiado perfecto
+Ley 48: Sé un camaleón, asume la forma que necesites
+
+Las Leyes de la Naturaleza Humana — Robert Greene:
+La Ley de la Irracionalidad: las emociones nublan el juicio cuando más importa
+La Ley del Narcisismo: ver el mundo solo desde tu propia perspectiva
+La Ley de la Envidia: exhibir el éxito entre quienes no lo tienen
+La Ley del Conformismo: desafiar las creencias del grupo abiertamente
+La Ley de la Negación: ignorar las señales de advertencia evidentes
+La Ley de la Impulsividad: actuar antes de pensar las consecuencias
+La Ley de la Represión: lo que niegas de ti mismo te destruye desde adentro
+La Ley de la Actitud: tu carácter es tu destino
+
+## BANCO DE OFICIOS MEDIEVALES
+
+Usa 5 oficios distintos, uno por historia.
+
+Alimentación: panadero, molinero, carnicero, cervecero, quesero, salador de
+carnes, cocinero de abadía.
+Textiles y cuero: curtidor, zapatero, tejedor, tintorero, pellejero,
+guarnicionero.
+Construcción y madera: cantero, carpintero, techador, albañil, tonelero,
+leñador, aserrador.
+Metal y fuego: herrero, armero, calderero, campanero, fundidor, acuñador.
+Transporte y comercio: carretero, barquero, arriero, mercader itinerante,
+cambista.
+Salud y cuidados: boticario, barbero-cirujano, partera, sangrador.
+Campo y animales: pastor, porquero, halconero, apicultor, quesero de campo,
+esquilador.
+Religión y manuscritos: amanuense, iluminador, encuadernador, campanero,
+sacristán.
+Oficios marginales: sepulturero, desollador, cazarratas, recaudador de
+diezmos, verdugo.
+
+## ESTRUCTURA NARRATIVA DE CADA HISTORIA
+
+Cada historia debe tener entre 140 y 150 palabras y seguir este arco:
+
+1. APERTURA — primera línea obligatoria con formato exacto:
+   "Es el año <Año>, en <Lugar>…"
+   Seguida de gratitud irónica por un daño menor de la semana.
+2. EL OFICIO — descripción integrada: herramientas, riesgos, clientela,
+   jerarquía, detalle material concreto.
+3. EL ASCENSO O LA ACCIÓN — el personaje actúa o prospera. El error que
+   comete parece razonable desde su perspectiva. No lo sabe todavía.
+4. LA ADVERTENCIA IGNORADA — esposa, vecino, señal obvia. Siempre hay una.
+   Siempre se ignora.
+5. LA CONSECUENCIA TRÁGICA — muerte, ruina o perdición directamente
+   conectada a la ley violada. La ironía entre el error y el castigo debe
+   ser evidente. Puede ser física, social o económica según la historia.
+6. SENTENCIA FINAL — 1 o 2 líneas que destilan la ley sin nombrar a Greene.
+   Tono de refrán antiguo. Sin explicaciones. Solo la verdad.
+
+## REGLA DE LA SOPA
+
+Cada historia debe incluir una sopa específica y concreta, mencionada por
+nombre o ingredientes. Aparece siempre en la sección del hogar, servida por
+la esposa, como símbolo de la vida normal que el personaje está a punto de
+perder. En el campo "sopa" del JSON de salida escribe solo el nombre de la
+sopa (ej. "sopa de lentejas con romero y vinagre").
+
+## FORMATO DEL PROMPT DE MIDJOURNEY
+
+- Iniciar exactamente con: mediaval art image of:
+- Describir escena, personajes, ambiente, época, iluminación, estilo y
+  detalles visuales.
+- Preferir el momento justo antes del colapso, o la ironía visual de la
+  tragedia.
+- Una sola línea, sin saltos de línea.
+
+## CAMPO "detalles"
+
+En el campo "detalles" escribe la ley violada + una descripción breve de
+cómo la viola el personaje.`;
+
+// Parsea la respuesta de Claude: un array JSON de 5 objetos historia.
+function parseHistorias(salida) {
+  const jsonTxt = (salida.match(/\[[\s\S]*\]/) || [])[0];
+  if (!jsonTxt) throw new Error('Claude no devolvió un array JSON reconocible.');
+  const arr = JSON.parse(jsonTxt);
+  if (!Array.isArray(arr) || !arr.length) throw new Error('El JSON no contiene historias.');
+  return arr;
+}
+
+async function generarTragedias() {
+  const inspiracion = await leerContenidoPagina(PAGE_ID_FUENTE);
+
+  const userMsg = `Fuente de inspiración (Top 10 historia, para calibrar tono y patrones narrativos):
+${inspiracion}
+
+Genera 5 historias siguiendo exactamente las reglas del system prompt. No
+repitas ley ni oficio entre las 5. Responde ÚNICAMENTE con un array JSON
+válido, sin texto adicional ni markdown, con este esquema exacto por
+historia:
+[{"titulo":"","historia":"","promptImagen":"","oficio":"","anio":1234,"lugar":"","sopa":"","detalles":""}]`;
+
+  const salida = await llamarClaude(SYSTEM_PROMPT, userMsg, 6000);
+  const historias = parseHistorias(salida);
+
+  const creadas = [];
+  const errores = [];
+  for (const h of historias) {
+    try {
+      const pagina = await crearHistoriaCompleta({
+        titulo: h.titulo,
+        historia: h.historia,
+        promptImagen: h.promptImagen,
+        category: CATEGORY,
+        oficio: h.oficio,
+        anio: h.anio,
+        lugar: h.lugar,
+        sopa: h.sopa,
+        detalles: h.detalles,
+        estado: 'Revision',
+      });
+      creadas.push({ titulo: h.titulo, id: pagina.id });
+    } catch (err) {
+      errores.push({ titulo: h.titulo || '(sin título)', error: err.message });
+    }
+  }
+  return { creadas, errores };
+}
+
+exports.handler = async (event) => {
+  const fail = requireAuth(event);
+  if (fail) return fail;
+
+  try {
+    const resultado = await generarTragedias();
+    const statusCode = resultado.errores.length ? 207 : 200;
+    return { statusCode, body: JSON.stringify({ ok: true, ...resultado }) };
+  } catch (err) {
+    console.error(err);
+    return { statusCode: 500, body: JSON.stringify({ ok: false, error: err.message }) };
+  }
+};
+
+exports.generarTragedias = generarTragedias;

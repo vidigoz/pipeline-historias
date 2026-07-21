@@ -1,8 +1,9 @@
 // netlify/functions/listar-historias.js
 //
 // Devuelve la lista de historias de vidiclip_db para la tabla del dashboard:
-// título, estado y fecha de creación. El dashboard usa el estado de cada una
-// para decidir qué agente ofrece disparar con "Ejecutar siguiente paso".
+// título, estado y fecha de creación. El dashboard solo muestra las que
+// están en "Revision", esperando que el usuario suba la imagen y pase el
+// Estado a "Listo" a mano.
 
 const { requireAuth } = require('./lib/auth');
 const { listarHistorias } = require('./lib/notion');

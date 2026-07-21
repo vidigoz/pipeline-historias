@@ -7,8 +7,3 @@
 
 # El dashboard vive en public/index.html y se sirve en la raíz "/".
 # Los endpoints siguen resolviéndose en /.netlify/functions/<nombre>.
-
-# El Buscador de Semillas corre por horario, no por webhook. Netlify lee el cron
-# directamente del "exports.config.schedule" dentro de buscador-semillas.js.
-# El endpoint trigger-semillas.js reutiliza la misma lógica para el botón manual
-# del dashboard, sin tocar el cron.

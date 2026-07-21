@@ -92,49 +92,6 @@
       white-space: nowrap;
     }
     .fecha { color: var(--muted); font-size: 0.82rem; white-space: nowrap; }
-    /* Acordeón de prompts */
-    details.prompt {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      margin-bottom: 10px;
-      overflow: hidden;
-    }
-    details.prompt > summary {
-      cursor: pointer;
-      padding: 14px;
-      font-weight: 600;
-      list-style: none;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-    details.prompt > summary::-webkit-details-marker { display: none; }
-    .tag {
-      font-size: 0.7rem;
-      padding: 2px 7px;
-      border-radius: 999px;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-    }
-    .tag.default { background: #2a2f38; color: var(--muted); }
-    .tag.blobs { background: rgba(63,185,107,0.18); color: var(--ok); }
-    .prompt-body { padding: 0 14px 14px; }
-    textarea {
-      width: 100%;
-      min-height: 220px;
-      resize: vertical;
-      background: var(--bg);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.85rem;
-      line-height: 1.5;
-    }
-    .prompt-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
     .msg { font-size: 0.85rem; }
     .msg.ok { color: var(--ok); }
     .msg.err { color: var(--err); }
@@ -204,31 +161,27 @@
     <div class="wrap">
       <div class="banner" id="banner"></div>
 
-      <!-- 1. Generar semilla -->
+      <!-- 1. Generar historias -->
       <section>
-        <button class="primary big" id="gen-btn">✨ Generar historia semilla ahora</button>
-        <p class="hint" id="gen-hint">Dispara el Buscador de Semillas sin esperar al cron diario. Crea la premisa, la manda al Estructurista y la deja en "Estructura" para tu revisión.</p>
+        <div class="row-actions">
+          <button class="primary big" id="gen-tragedias-btn">⚔️ Generar 5 Tragedias</button>
+          <button class="primary big" id="gen-comedias-btn">🍺 Generar 5 Comedias</button>
+        </div>
+        <p class="hint">Genera 5 historias completas (texto, prompt de imagen, oficio, año, lugar, sopa) y las publica en Notion con Estado "Revision".</p>
       </section>
 
-      <!-- 3. Panel de historias -->
+      <!-- 2. Panel de historias -->
       <section>
         <h2>Historias <button id="refresh" style="font-size:0.78rem;padding:4px 10px;">↻ Actualizar</button></h2>
         <div class="card" id="historias-card">
           <p class="muted" id="historias-loading">Cargando…</p>
           <table id="historias-tabla" hidden>
             <thead>
-              <tr><th>Título</th><th>Estado</th><th>Creada</th><th>Acción</th></tr>
+              <tr><th>Título</th><th>Estado</th><th>Creada</th></tr>
             </thead>
             <tbody id="historias-body"></tbody>
           </table>
         </div>
-      </section>
-
-      <!-- 2. Editor de prompts -->
-      <section>
-        <h2>Prompts de los agentes</h2>
-        <div id="prompts-loading" class="muted">Cargando prompts…</div>
-        <div id="prompts-container"></div>
       </section>
     </div>
   </div>
@@ -240,37 +193,9 @@
     const KEY = 'vidigoz_dash_pw';
     let PW = sessionStorage.getItem(KEY) || '';
 
-    // Nombres "bonitos" de cada agente para el editor de prompts
-    const NOMBRES = {
-      PROMPT_BUSCADOR_SEMILLAS: '1 · Buscador de Semillas',
-      PROMPT_ESTRUCTURISTA: '2 · Estructurista',
-      PROMPT_REDACTOR: '3 · Redactor',
-      PROMPT_VERIFICADOR_HISTORICO: '4 · Verificador Histórico',
-      PROMPT_CAZADOR_IA: '5 · Cazador de IA',
-      PROMPT_EDITOR_FINAL: '6 · Editor Final',
-    };
-
-    // Estados que esperan una acción manual tuya (no hay "siguiente paso" auto)
-    const ESPERA_MANUAL = {
-      Revision: 'Pipeline terminado (revisión manual)',
-    };
-    // Cada estado transitorio corre UN solo agente por click (evita el 504 de
-    // encadenar los 4 en una sola llamada). "Estructura" aprueba y arranca el
-    // Redactor; los siguientes 3 estados avanzan con "Continuar" hasta dejar
-    // la historia en "Revision". "Semilla" no aparece aquí porque el Buscador
-    // de Semillas encadena el Estructurista solo.
-    const TIENE_PASO = ['Estructura', 'Redactado', 'Verificado', 'Pulido'];
-    // Texto del botón según el estado (default: "Ejecutar siguiente paso")
-    const TEXTO_BOTON = {
-      Estructura: '✓ Aprobar',
-      Redactado: '→ Continuar',
-      Verificado: '→ Continuar',
-      Pulido: '→ Continuar',
-    };
-    // Solo mostramos historias en estos estados en el dashboard. Redactado/
-    // Verificado/Pulido son transitorios (deberían durar segundos dentro de
-    // la cadena), pero se incluyen por si una corrida falla a medias.
-    const ESTADOS_VISIBLES = ['Estructura', 'Redactado', 'Verificado', 'Pulido', 'Revision'];
+    // Único estado que se muestra: historias generadas, esperando revisión
+    // manual (subir imagen y pasar a "Listo" a mano).
+    const ESTADOS_VISIBLES = ['Revision'];
 
     // ---- Helper de fetch autenticado ----
     async function api(path, body) {
@@ -305,8 +230,8 @@
     // ---- Login ----
     async function intentarLogin(pw) {
       PW = pw;
-      // Validamos contra un endpoint real (get-prompts) para confirmar la contraseña.
-      await api('get-prompts');
+      // Validamos contra un endpoint real (listar-historias) para confirmar la contraseña.
+      await api('listar-historias');
       sessionStorage.setItem(KEY, pw);
     }
 
@@ -314,7 +239,6 @@
       document.getElementById('login').style.display = 'none';
       document.getElementById('app').hidden = false;
       cargarHistorias();
-      cargarPrompts();
     }
 
     function logout() {
@@ -346,23 +270,29 @@
       }
     }
 
-    // ---- 1. Generar semilla ----
-    document.getElementById('gen-btn').addEventListener('click', async () => {
-      const btn = document.getElementById('gen-btn');
-      btn.disabled = true; btn.textContent = 'Generando… (puede tardar ~1 min)';
+    // ---- 1. Generar historias ----
+    async function generar(endpoint, btn, etiqueta) {
+      btn.disabled = true;
+      const orig = btn.textContent;
+      btn.textContent = 'Generando… (puede tardar ~1-2 min)';
       try {
-        const r = await api('trigger-semillas');
-        const n = (r.creadas || []).length;
-        banner(`Se crearon ${n} historia(s) semilla nueva(s).`, 'ok');
+        const r = await api(endpoint);
+        let msg = `Se crearon ${r.creadas.length} historia(s) de ${etiqueta}.`;
+        if (r.errores && r.errores.length) {
+          msg += ` Fallaron ${r.errores.length}: ${r.errores.map(e => e.titulo).join(', ')}`;
+        }
+        banner(msg, (r.errores && r.errores.length) ? 'err' : 'ok');
         cargarHistorias();
       } catch (e) {
         banner('Error al generar: ' + e.message, 'err');
       } finally {
-        btn.disabled = false; btn.textContent = '✨ Generar historia semilla ahora';
+        btn.disabled = false; btn.textContent = orig;
       }
-    });
+    }
+    document.getElementById('gen-tragedias-btn').addEventListener('click', (e) => generar('generar-tragedias', e.currentTarget, 'tragedia'));
+    document.getElementById('gen-comedias-btn').addEventListener('click', (e) => generar('generar-comedias', e.currentTarget, 'comedia'));
 
-    // ---- 3. Historias ----
+    // ---- 2. Historias ----
     document.getElementById('refresh').addEventListener('click', cargarHistorias);
 
     async function cargarHistorias() {
@@ -413,110 +343,8 @@
       tdF.setAttribute('data-label', 'Creada');
       tdF.innerHTML = `<span class="fecha">${fmtFecha(h.creado)}</span>`;
 
-      const tdA = document.createElement('td');
-      tdA.setAttribute('data-label', 'Acción');
-      const wrap = document.createElement('div');
-      wrap.className = 'row-actions';
-
-      if (TIENE_PASO.includes(h.estado)) {
-        const b = document.createElement('button');
-        b.textContent = TEXTO_BOTON[h.estado] || 'Ejecutar siguiente paso';
-        b.style.fontSize = '0.82rem';
-        b.addEventListener('click', () => ejecutarPaso(h, b));
-        wrap.appendChild(b);
-      } else {
-        const span = document.createElement('span');
-        span.className = 'msg warn';
-        span.textContent = ESPERA_MANUAL[h.estado] || 'Sin siguiente paso';
-        wrap.appendChild(span);
-      }
-      tdA.appendChild(wrap);
-
-      tr.append(tdT, tdE, tdF, tdA);
+      tr.append(tdT, tdE, tdF);
       return tr;
-    }
-
-    async function ejecutarPaso(h, btn) {
-      btn.disabled = true;
-      const orig = btn.textContent;
-      btn.textContent = 'Procesando… (puede tardar)';
-      try {
-        const r = await api('ejecutar-paso', { page_id: h.id, estado: h.estado });
-        banner(`${r.agente} corrió sobre "${h.titulo}". Nuevo estado: ${r.nuevoEstado}.`, 'ok');
-        cargarHistorias();
-      } catch (e) {
-        if (e.status === 409 && e.data && e.data.esperaManual) {
-          banner(e.message, 'err');
-        } else {
-          banner('Error: ' + e.message, 'err');
-        }
-        btn.disabled = false; btn.textContent = orig;
-      }
-    }
-
-    // ---- 2. Prompts ----
-    async function cargarPrompts() {
-      const loading = document.getElementById('prompts-loading');
-      const cont = document.getElementById('prompts-container');
-      loading.style.display = 'block';
-      cont.innerHTML = '';
-      try {
-        const r = await api('get-prompts');
-        for (const p of r.prompts) {
-          cont.appendChild(tarjetaPrompt(p));
-        }
-        loading.style.display = 'none';
-      } catch (e) {
-        loading.textContent = 'Error al cargar prompts: ' + e.message;
-      }
-    }
-
-    function tarjetaPrompt(p) {
-      const det = document.createElement('details');
-      det.className = 'prompt';
-
-      const tagClass = p.fuente === 'blobs' ? 'blobs' : 'default';
-      const tagTxt = p.fuente === 'blobs' ? 'editado' : 'default';
-
-      const sum = document.createElement('summary');
-      sum.innerHTML = `<span>${NOMBRES[p.nombre] || p.nombre}</span><span class="tag ${tagClass}" data-tag>${tagTxt}</span>`;
-
-      const bodyDiv = document.createElement('div');
-      bodyDiv.className = 'prompt-body';
-
-      const ta = document.createElement('textarea');
-      ta.value = p.texto;
-
-      const actions = document.createElement('div');
-      actions.className = 'prompt-actions';
-
-      const saveBtn = document.createElement('button');
-      saveBtn.className = 'primary';
-      saveBtn.textContent = 'Guardar';
-
-      const msg = document.createElement('span');
-      msg.className = 'msg';
-
-      saveBtn.addEventListener('click', async () => {
-        saveBtn.disabled = true;
-        msg.className = 'msg'; msg.textContent = 'Guardando…';
-        try {
-          await api('save-prompts', { prompts: { [p.nombre]: ta.value } });
-          msg.className = 'msg ok'; msg.textContent = 'Guardado ✓';
-          const tag = sum.querySelector('[data-tag]');
-          tag.className = 'tag blobs'; tag.textContent = 'editado';
-          setTimeout(() => { msg.textContent = ''; }, 3000);
-        } catch (e) {
-          msg.className = 'msg err'; msg.textContent = 'Error: ' + e.message;
-        } finally {
-          saveBtn.disabled = false;
-        }
-      });
-
-      actions.append(saveBtn, msg);
-      bodyDiv.append(ta, actions);
-      det.append(sum, bodyDiv);
-      return det;
     }
 
     function escapeHtml(s) {
@@ -527,7 +355,7 @@
     // Si ya hay contraseña en memoria de sesión, intentamos entrar directo.
     (async () => {
       if (PW) {
-        try { await api('get-prompts'); mostrarApp(); return; } catch (_) { logout(); }
+        try { await api('listar-historias'); mostrarApp(); return; } catch (_) { logout(); }
       }
       document.getElementById('pw').focus();
     })();
