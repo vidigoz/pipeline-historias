@@ -1,6 +1,6 @@
 {
   "name": "pipeline-historias",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "Generador de historias medievales de Tragedias y Comedias (Netlify Functions) para VidiGozTV",
   "private": true
 }
