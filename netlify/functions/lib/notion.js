@@ -51,7 +51,7 @@ async function updatePage(pageId, { historia, detalles, estado, sopa, lugar, ani
     properties['Año'] = { number: anio };
   }
   if (promptImagen !== undefined) {
-    properties['Prompt de imagen'] = { rich_text: [{ text: { content: promptImagen.slice(0, 2000) } }] };
+    properties['Prompt de Imagen'] = { rich_text: [{ text: { content: promptImagen.slice(0, 2000) } }] };
   }
 
   const res = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
