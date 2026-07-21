@@ -47,28 +47,6 @@ async function crearHistoriaCompleta({ titulo, historia, promptImagen, category,
   return res.json();
 }
 
-// Lee el texto plano de todos los bloques hijos de una página normal de
-// Notion (no una fila de base de datos) — se usa como fuente de inspiración
-// de estilo para los agentes de Tragedias/Comedias.
-async function leerContenidoPagina(pageId) {
-  let cursor;
-  const textos = [];
-  do {
-    const url = new URL(`https://api.notion.com/v1/blocks/${pageId}/children`);
-    url.searchParams.set('page_size', '100');
-    if (cursor) url.searchParams.set('start_cursor', cursor);
-    const res = await fetch(url, { headers: headers() });
-    if (!res.ok) throw new Error(`Notion leerContenidoPagina falló: ${res.status} ${await res.text()}`);
-    const data = await res.json();
-    for (const block of data.results) {
-      const rich = block[block.type]?.rich_text;
-      if (Array.isArray(rich)) textos.push(rich.map((t) => t.plain_text).join(''));
-    }
-    cursor = data.has_more ? data.next_cursor : null;
-  } while (cursor);
-  return textos.filter(Boolean).join('\n');
-}
-
 // Lista historias de vidiclip_db para el dashboard: título, estado, fecha de
 // creación (created_time nativo de Notion, no requiere propiedad extra) y el id.
 async function listarHistorias(n = 50) {
@@ -91,4 +69,4 @@ async function listarHistorias(n = 50) {
   }));
 }
 
-module.exports = { crearHistoriaCompleta, leerContenidoPagina, listarHistorias, plain };
+module.exports = { crearHistoriaCompleta, listarHistorias, plain };

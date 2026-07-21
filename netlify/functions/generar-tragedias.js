@@ -7,17 +7,17 @@
 // pasos intermedios ni cascada — de aquí en más el flujo es 100% manual
 // (el usuario revisa, sube imagen, pasa a "Listo").
 //
-// Bajado de 5 a 3 historias por corrida: generar 5 historias completas en
-// una sola llamada a Claude superaba el límite de 10s de Netlify Functions
-// (plan Personal, sin Background Functions) y daba 504.
+// Bajado de 5 a 3 historias por corrida, y la fuente de inspiración de
+// estilo ya no se lee en vivo de Notion (sumaba latencia de red variable):
+// se embebió como texto fijo en lib/referencias.js. Ambos cambios buscan
+// evitar el 504 por el límite de 10s de Netlify Functions (plan Personal,
+// sin Background Functions).
 
 const { requireAuth } = require('./lib/auth');
-const { leerContenidoPagina, crearHistoriaCompleta } = require('./lib/notion');
+const { crearHistoriaCompleta } = require('./lib/notion');
 const { llamarClaude } = require('./lib/claude');
+const { HISTORIAS_REFERENCIA } = require('./lib/referencias');
 
-// ID de la página de Notion "Top 10 historia", usada como fuente de
-// inspiración de estilo (no una fila de vidiclip_db).
-const PAGE_ID_FUENTE = '31cd33622b91805eb346e9d2066efa72';
 const CATEGORY = 'Tragedia';
 
 const SYSTEM_PROMPT = `Eres el Agente de Tragedias Medievales del canal VidiGozTV — Leyes de Greene v1.
@@ -27,8 +27,8 @@ o devastadoras.
 
 ## FUENTE DE INSPIRACIÓN
 
-Se te da como referencia el contenido de "Top 10 historia" en Notion. Analiza
-los patrones antes de escribir:
+Se te dan como referencia historias del canal ya publicadas. Analiza los
+patrones antes de escribir:
 - Segunda persona singular, tono irónico y cotidiano
 - Oficio medieval integrado con herramientas, riesgos y jerarquías
 - Gratitud por daño menor como señal de buena fortuna
@@ -184,10 +184,8 @@ function parseHistorias(salida) {
 }
 
 async function generarTragedias() {
-  const inspiracion = await leerContenidoPagina(PAGE_ID_FUENTE);
-
-  const userMsg = `Fuente de inspiración (Top 10 historia, para calibrar tono y patrones narrativos):
-${inspiracion}
+  const userMsg = `Fuente de inspiración (historias ya publicadas, para calibrar tono y patrones narrativos):
+${HISTORIAS_REFERENCIA}
 
 Genera 3 historias siguiendo exactamente las reglas del system prompt. No
 repitas ley ni oficio entre las 3. Responde ÚNICAMENTE con un array JSON
