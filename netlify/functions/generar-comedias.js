@@ -1,17 +1,17 @@
 // netlify/functions/generar-comedias.js
 //
-// Agente autocontenido: en una sola llamada a Claude genera 3 historias
-// medievales de tipo COMEDIA (spec completa en
-// agentes/agente_historias_medievales_v3.md) y las publica directo en
+// Agente autocontenido: en una sola llamada a Claude genera 1 historia
+// medieval de tipo COMEDIA (spec completa en
+// agentes/agente_historias_medievales_v3.md) y la publica directo en
 // vidiclip_db con todos los campos llenos, en Estado "Revision". No hay
 // pasos intermedios ni cascada — de aquí en más el flujo es 100% manual
 // (el usuario revisa, sube imagen, pasa a "Listo").
 //
-// Bajado de 5 a 3 historias por corrida, y la fuente de inspiración de
-// estilo ya no se lee en vivo de Notion (sumaba latencia de red variable):
-// se embebió como texto fijo en lib/referencias.js. Ambos cambios buscan
-// evitar el 504 por el límite de 10s de Netlify Functions (plan Personal,
-// sin Background Functions).
+// Bajado de 5 a 3 y finalmente a 1 historia por corrida: incluso 3 historias
+// completas en una sola llamada a Claude superaba el límite de 10s de
+// Netlify Functions (plan Personal, sin Background Functions) y daba 504.
+// El límite es real: en el chat de Claude (sin ese límite de tiempo) la
+// misma tarea sí completaba, porque ahí no hay corte a los 10s.
 
 const { requireAuth } = require('./lib/auth');
 const { crearHistoriaCompleta } = require('./lib/notion');
@@ -21,8 +21,8 @@ const { HISTORIAS_REFERENCIA } = require('./lib/referencias');
 const CATEGORY = 'Comedia';
 
 const SYSTEM_PROMPT = `Eres el Agente de Historias Medievales del canal VidiGozTV — v3 (Comedias).
-Generas 3 historias medievales de tipo COMEDIA, con final positivo o
-irónico, nunca trágico.
+Generas 1 historia medieval de tipo COMEDIA, con final positivo o irónico,
+nunca trágico.
 
 ## FUENTE DE INSPIRACIÓN
 
@@ -35,11 +35,10 @@ historias y extrae patrones repetidos, por ejemplo:
   bendecidas
 
 Antes de escribir: lee las historias, identifica los patrones que más se
-repiten, y úsalos como guías creativas para las 3 historias nuevas.
+repiten, y úsalos como guía creativa para la historia nueva.
 
-## REGLAS PARA VARIAR LOS OFICIOS (MUY IMPORTANTE)
+## REGLAS PARA EL OFICIO (MUY IMPORTANTE)
 
-- Usa 3 oficios distintos, uno por historia. No los repitas entre sí.
 - Prefiere oficios menos obvios además de los típicos (verdugo, médico,
   inquisidor, etc.).
 - El oficio debe estar completamente integrado en la historia: herramientas,
@@ -131,7 +130,7 @@ function repararControlesEnStrings(jsonTxt) {
   return out;
 }
 
-// Parsea la respuesta de Claude: un array JSON de 3 objetos historia. Si el
+// Parsea la respuesta de Claude: un array JSON de 1 objeto historia. Si el
 // parseo directo falla (Claude no escapó bien saltos de línea/tabs dentro de
 // un string), reintenta una vez con el texto reparado antes de rendirse.
 function parseHistorias(salida) {
@@ -157,9 +156,9 @@ async function generarComedias() {
   const userMsg = `Fuente de inspiración (historias ya publicadas, para calibrar tono y patrones narrativos):
 ${HISTORIAS_REFERENCIA}
 
-Genera 3 historias siguiendo exactamente las reglas del system prompt. No
-repitas oficio entre las 3. Responde ÚNICAMENTE con un array JSON válido,
-sin texto adicional ni markdown, con este esquema exacto por historia:
+Genera 1 historia siguiendo exactamente las reglas del system prompt.
+Responde ÚNICAMENTE con un array JSON de un solo elemento, sin texto
+adicional ni markdown, con este esquema exacto:
 [{"titulo":"","historia":"","promptImagen":"","oficio":"","anio":1234,"lugar":"","sopa":"","detalles":""}]
 
 Importante sobre el formato JSON: el campo "historia" es texto largo en
@@ -168,7 +167,7 @@ usando \\n para cualquier salto de línea y \\" para comillas dobles
 internas. No devuelvas saltos de línea reales (sin escapar) dentro de
 ningún valor de texto.`;
 
-  const salida = await llamarClaude(SYSTEM_PROMPT, userMsg, 4000);
+  const salida = await llamarClaude(SYSTEM_PROMPT, userMsg, 1500);
   const historias = parseHistorias(salida);
 
   const creadas = [];
