@@ -87,9 +87,11 @@ const PROMPT_EDITOR_FINAL = `Eres el Editor Final del canal VidiGozTV.
 Haces la última pasada: ritmo, longitud, que no sobre ni falte nada, que el
 cierre pegue. Usa las historias de referencia como benchmark de calidad final.
 
-Además del texto, extrae de la historia estos 4 datos y un prompt de imagen:
+Además del texto, extrae de la historia estos 5 datos y un prompt de imagen:
 - AÑO: el año exacto declarado o implícito en la historia (solo el número).
 - LUGAR: el lugar (ciudad/región/país) donde ocurre.
+- OFICIO: el oficio, ocupación o rol del protagonista (ej. campanero,
+  herrero, panadero), tal como se desprenda de la historia.
 - SOPA: la sopa concreta que prepara la esposa, con sus ingredientes, tal
   como aparece en el texto.
 - PROMPT_IMAGEN: un prompt en inglés para un generador de imágenes (estilo
@@ -102,6 +104,7 @@ HISTORIA:
 <el texto final completo>
 AÑO: <número>
 LUGAR: <texto>
+OFICIO: <texto>
 SOPA: <texto>
 PROMPT_IMAGEN: <texto>`;
 

@@ -30,7 +30,7 @@ async function getPage(pageId) {
 }
 
 // Actualiza propiedades de texto + Estado de una página
-async function updatePage(pageId, { historia, detalles, estado, sopa, lugar, anio, promptImagen }) {
+async function updatePage(pageId, { historia, detalles, estado, sopa, lugar, anio, oficio, promptImagen }) {
   const properties = {};
   if (historia !== undefined) {
     properties['Historia'] = { rich_text: [{ text: { content: historia.slice(0, 2000) } }] };
@@ -46,6 +46,9 @@ async function updatePage(pageId, { historia, detalles, estado, sopa, lugar, ani
   }
   if (lugar !== undefined) {
     properties['Lugar'] = { rich_text: [{ text: { content: lugar.slice(0, 2000) } }] };
+  }
+  if (oficio !== undefined) {
+    properties['Oficio'] = { rich_text: [{ text: { content: oficio.slice(0, 2000) } }] };
   }
   if (anio !== undefined) {
     properties['Año'] = { number: anio };

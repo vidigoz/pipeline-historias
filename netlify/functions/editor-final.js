@@ -15,11 +15,12 @@ const { llamarClaude, bloqueEjemplos } = require('./lib/claude');
 const { getPrompt } = require('./lib/prompts');
 
 // Parsea la salida estructurada del Editor Final:
-// HISTORIA:\n<texto>\nAÑO: ..\nLUGAR: ..\nSOPA: ..\nPROMPT_IMAGEN: ..
+// HISTORIA:\n<texto>\nAÑO: ..\nLUGAR: ..\nOFICIO: ..\nSOPA: ..\nPROMPT_IMAGEN: ..
 function parseSalida(salida) {
   const historia = (salida.match(/HISTORIA:\s*([\s\S]*?)\s*AÑO:/)?.[1] || salida).trim();
   const anioTexto = salida.match(/AÑO:\s*(\d+)/)?.[1];
-  const lugar = salida.match(/LUGAR:\s*(.+)/)?.[1]?.trim() || '';
+  const lugar = salida.match(/LUGAR:\s*([\s\S]*?)\s*OFICIO:/)?.[1]?.trim() || '';
+  const oficio = salida.match(/OFICIO:\s*([\s\S]*?)\s*SOPA:/)?.[1]?.trim() || '';
   const sopa = salida.match(/SOPA:\s*([\s\S]*?)\s*PROMPT_IMAGEN:/)?.[1]?.trim() || '';
   const promptImagen = salida.match(/PROMPT_IMAGEN:\s*([\s\S]+)/)?.[1]?.trim() || '';
 
@@ -27,6 +28,7 @@ function parseSalida(salida) {
     historia,
     anio: anioTexto ? Number(anioTexto) : undefined,
     lugar,
+    oficio,
     sopa,
     promptImagen,
   };
@@ -46,13 +48,14 @@ async function ejecutarEditorFinal(pageId) {
     2000
   );
 
-  const { historia, anio, lugar, sopa, promptImagen } = parseSalida(salida);
+  const { historia, anio, lugar, oficio, sopa, promptImagen } = parseSalida(salida);
 
   await updatePage(pageId, {
     historia,
     estado: 'Revision',
     anio,
     lugar,
+    oficio,
     sopa,
     promptImagen,
   });
