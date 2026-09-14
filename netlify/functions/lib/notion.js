@@ -47,26 +47,68 @@ async function crearHistoriaCompleta({ titulo, historia, promptImagen, category,
   return res.json();
 }
 
-// Lista historias de vidiclip_db para el dashboard: título, estado, fecha de
-// creación (created_time nativo de Notion, no requiere propiedad extra) y el id.
-async function listarHistorias(n = 50) {
-  const res = await fetch(`https://api.notion.com/v1/databases/${DB_ID}/query`, {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify({
-      sorts: [{ timestamp: 'created_time', direction: 'descending' }],
-      page_size: n,
-    }),
-  });
-  if (!res.ok) throw new Error(`Notion listarHistorias falló: ${res.status} ${await res.text()}`);
-  const data = await res.json();
-  return data.results.map((page) => ({
-    id: page.id,
-    url: page.url,
-    titulo: plain(page.properties['Titulo']) || '(sin título)',
-    estado: page.properties['Estado']?.status?.name || '(sin estado)',
-    creado: page.created_time,
-  }));
+// Estados que le interesan al dashboard (las demás, p.ej. Programado/
+// Cancelado/Previo, no se muestran nunca en el panel).
+const ESTADOS_DASHBOARD = ['Revision', 'Listo'];
+
+// Lista historias de vidiclip_db para el dashboard: título, estado,
+// categoría, antigüedad y fecha de creación (created_time nativo de Notion).
+//
+// Filtramos por Estado directamente en Notion (en vez de traer un top-N y
+// filtrar en el cliente) porque la base ya tiene cientos de historias en
+// otros estados (Programado, Cancelado, Previo) que nunca se muestran; sin
+// este filtro, un límite fijo de página podía dejar fuera historias
+// recientes en Revision/Listo simplemente porque había muchas de otros
+// estados por delante en el orden de creación. Se pagina hasta traer todas
+// las que matchean, así el filtro de Antigüedad/Categoria en el frontend
+// siempre tiene el conjunto completo disponible.
+async function listarHistorias() {
+  const historias = [];
+  let cursor;
+  do {
+    const res = await fetch(`https://api.notion.com/v1/databases/${DB_ID}/query`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({
+        filter: {
+          or: ESTADOS_DASHBOARD.map((estado) => ({ property: 'Estado', status: { equals: estado } })),
+        },
+        sorts: [{ timestamp: 'created_time', direction: 'descending' }],
+        page_size: 100,
+        start_cursor: cursor,
+      }),
+    });
+    if (!res.ok) throw new Error(`Notion listarHistorias falló: ${res.status} ${await res.text()}`);
+    const data = await res.json();
+    for (const page of data.results) {
+      historias.push({
+        id: page.id,
+        url: page.url,
+        titulo: plain(page.properties['Titulo']) || '(sin título)',
+        estado: page.properties['Estado']?.status?.name || '(sin estado)',
+        categoria: page.properties['Category']?.select?.name || null,
+        antiguedad: page.properties['Antiguedad']?.select?.name || null,
+        creado: page.created_time,
+      });
+    }
+    cursor = data.has_more ? data.next_cursor : undefined;
+  } while (cursor);
+  return historias;
 }
 
-module.exports = { crearHistoriaCompleta, listarHistorias, plain };
+// Trae las opciones reales configuradas en Notion para los selects de
+// Category y Antiguedad, para que los filtros del dashboard siempre
+// reflejen lo que existe en la base (sin hardcodear valores que se
+// desactualizan cada vez que se agrega una categoría nueva en Notion).
+async function opcionesFiltro() {
+  const res = await fetch(`https://api.notion.com/v1/databases/${DB_ID}`, { headers: headers() });
+  if (!res.ok) throw new Error(`Notion opcionesFiltro falló: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  const props = data.properties || {};
+  return {
+    categorias: (props['Category']?.select?.options || []).map((o) => o.name),
+    antiguedades: (props['Antiguedad']?.select?.options || []).map((o) => o.name),
+  };
+}
+
+module.exports = { crearHistoriaCompleta, listarHistorias, opcionesFiltro, plain };

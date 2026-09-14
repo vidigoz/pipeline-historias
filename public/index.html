@@ -59,6 +59,15 @@
     }
     button:hover { background: #2f3540; }
     button:disabled { opacity: 0.5; cursor: default; }
+    select {
+      font: inherit;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--card-2);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 9px 12px;
+    }
     button.primary {
       background: var(--accent);
       border-color: var(--accent-strong);
@@ -78,10 +87,17 @@
       border-radius: 12px;
       padding: 14px;
     }
+    .historias-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .historias-col > h3 { font-size: 0.85rem; color: var(--muted); margin: 0 0 8px; }
+    @media (max-width: 620px) {
+      .historias-grid { grid-template-columns: 1fr; }
+    }
     /* Tabla de historias -> se colapsa en tarjetas en móvil */
     table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
     th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    td a { color: var(--text); text-decoration: underline; text-decoration-color: var(--border); }
+    td a:hover { text-decoration-color: var(--text); }
     .estado {
       display: inline-block;
       padding: 2px 9px;
@@ -173,14 +189,39 @@
       <!-- 2. Panel de historias -->
       <section>
         <h2>Historias <button id="refresh" style="font-size:0.78rem;padding:4px 10px;">↻ Actualizar</button></h2>
-        <div class="card" id="historias-card">
-          <p class="muted" id="historias-loading">Cargando…</p>
-          <table id="historias-tabla" hidden>
-            <thead>
-              <tr><th>Título</th><th>Estado</th><th>Creada</th></tr>
-            </thead>
-            <tbody id="historias-body"></tbody>
-          </table>
+        <div class="row-actions" style="margin-bottom:14px;">
+          <select id="filtro-categoria">
+            <option value="all">Todas las categorías</option>
+          </select>
+          <select id="filtro-antiguedad">
+            <option value="all">Cualquier antigüedad</option>
+          </select>
+        </div>
+        <div class="historias-grid">
+          <div class="historias-col">
+            <h3>En revisión</h3>
+            <div class="card" id="revision-card">
+              <p class="muted" id="revision-loading">Cargando…</p>
+              <table id="revision-tabla" hidden>
+                <thead>
+                  <tr><th>Título</th><th>Estado</th><th>Categoría</th><th>Antigüedad</th><th>Creada</th></tr>
+                </thead>
+                <tbody id="revision-body"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="historias-col">
+            <h3>Listas</h3>
+            <div class="card" id="listas-card">
+              <p class="muted" id="listas-loading">Cargando…</p>
+              <table id="listas-tabla" hidden>
+                <thead>
+                  <tr><th>Título</th><th>Estado</th><th>Categoría</th><th>Antigüedad</th><th>Creada</th></tr>
+                </thead>
+                <tbody id="listas-body"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -193,9 +234,18 @@
     const KEY = 'vidigoz_dash_pw';
     let PW = sessionStorage.getItem(KEY) || '';
 
-    // Único estado que se muestra: historias generadas, esperando revisión
-    // manual (subir imagen y pasar a "Listo" a mano).
-    const ESTADOS_VISIBLES = ['Revision'];
+    // Dos estados que se muestran: historias generadas esperando revisión
+    // manual (subir imagen y pasar a "Listo" a mano), y las que ya quedaron
+    // en "Listo".
+    const ESTADO_REVISION = 'Revision';
+    const ESTADO_LISTO = 'Listo';
+
+    // Filtros activos (Categoria/Antiguedad, ambos propiedades "select" de
+    // Notion) y última respuesta cruda del backend, para poder re-pintar
+    // sin volver a pedir datos a Notion en cada cambio de filtro.
+    let filtroCategoria = 'all';
+    let filtroAntiguedad = 'all';
+    let ultimasHistorias = [];
 
     // ---- Helper de fetch autenticado ----
     async function api(path, body) {
@@ -294,29 +344,96 @@
 
     // ---- 2. Historias ----
     document.getElementById('refresh').addEventListener('click', cargarHistorias);
+    document.getElementById('filtro-categoria').addEventListener('change', (e) => {
+      filtroCategoria = e.target.value;
+      pintarListas();
+    });
+    document.getElementById('filtro-antiguedad').addEventListener('change', (e) => {
+      filtroAntiguedad = e.target.value;
+      pintarListas();
+    });
 
     async function cargarHistorias() {
-      const loading = document.getElementById('historias-loading');
-      const tabla = document.getElementById('historias-tabla');
-      const body = document.getElementById('historias-body');
-      loading.hidden = false; loading.textContent = 'Cargando…';
-      tabla.hidden = true;
+      for (const id of ['revision-loading', 'listas-loading']) {
+        document.getElementById(id).hidden = false;
+        document.getElementById(id).textContent = 'Cargando…';
+      }
+      document.getElementById('revision-tabla').hidden = true;
+      document.getElementById('listas-tabla').hidden = true;
       try {
         const r = await api('listar-historias');
-        body.innerHTML = '';
-        const historias = r.historias.filter(h => ESTADOS_VISIBLES.includes(h.estado));
-        if (!historias.length) {
-          loading.textContent = 'No hay historias esperando tu revisión.';
-          return;
-        }
-        for (const h of historias) {
-          body.appendChild(filaHistoria(h));
-        }
-        loading.hidden = true;
-        tabla.hidden = false;
+        ultimasHistorias = r.historias;
+        poblarOpcionesFiltro(r.opciones);
+        pintarListas();
       } catch (e) {
-        loading.textContent = 'Error: ' + e.message;
+        document.getElementById('revision-loading').textContent = 'Error: ' + e.message;
+        document.getElementById('listas-loading').textContent = 'Error: ' + e.message;
       }
+    }
+
+    // Llena los <select> de filtro con las opciones reales que existen en
+    // Notion (Category/Antiguedad), en vez de tenerlas hardcodeadas, para
+    // que una categoría nueva agregada en Notion aparezca sola. Conserva la
+    // selección actual si sigue siendo válida.
+    function poblarOpciones(select, valores) {
+      const actual = select.value;
+      select.querySelectorAll('option:not([value="all"])').forEach((o) => o.remove());
+      for (const v of valores) {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        select.appendChild(opt);
+      }
+      if (valores.includes(actual)) select.value = actual;
+    }
+
+    function poblarOpcionesFiltro(opciones) {
+      if (!opciones) return;
+      poblarOpciones(document.getElementById('filtro-categoria'), opciones.categorias || []);
+      poblarOpciones(document.getElementById('filtro-antiguedad'), opciones.antiguedades || []);
+    }
+
+    // Aplica los filtros de Categoria/Antiguedad (independiente del estado).
+    function pasaFiltros(h) {
+      return (filtroCategoria === 'all' || h.categoria === filtroCategoria)
+          && (filtroAntiguedad === 'all' || h.antiguedad === filtroAntiguedad);
+    }
+
+    // Pinta ambas listas a partir de `ultimasHistorias`, sin volver a pedir
+    // datos a Notion (se usa tanto al cargar como al cambiar un filtro).
+    function pintarListas() {
+      renderLista(ESTADO_REVISION, {
+        tbodyId: 'revision-body',
+        tablaId: 'revision-tabla',
+        loadingId: 'revision-loading',
+        mensajeVacio: 'No hay historias esperando tu revisión.',
+      });
+      renderLista(ESTADO_LISTO, {
+        tbodyId: 'listas-body',
+        tablaId: 'listas-tabla',
+        loadingId: 'listas-loading',
+        mensajeVacio: 'No hay historias listas todavía.',
+      });
+    }
+
+    function renderLista(estado, { tbodyId, tablaId, loadingId, mensajeVacio }) {
+      const historias = ultimasHistorias.filter((h) => h.estado === estado && pasaFiltros(h));
+      const body = document.getElementById(tbodyId);
+      const tabla = document.getElementById(tablaId);
+      const loading = document.getElementById(loadingId);
+
+      body.innerHTML = '';
+      if (!historias.length) {
+        tabla.hidden = true;
+        loading.hidden = false;
+        loading.textContent = mensajeVacio;
+        return;
+      }
+      for (const h of historias) {
+        body.appendChild(filaHistoria(h));
+      }
+      loading.hidden = true;
+      tabla.hidden = false;
     }
 
     function filaHistoria(h) {
@@ -339,11 +456,19 @@
       tdE.setAttribute('data-label', 'Estado');
       tdE.innerHTML = `<span class="estado">${escapeHtml(h.estado)}</span>`;
 
+      const tdC = document.createElement('td');
+      tdC.setAttribute('data-label', 'Categoría');
+      tdC.textContent = h.categoria || '—';
+
+      const tdA = document.createElement('td');
+      tdA.setAttribute('data-label', 'Antigüedad');
+      tdA.textContent = h.antiguedad || '—';
+
       const tdF = document.createElement('td');
       tdF.setAttribute('data-label', 'Creada');
       tdF.innerHTML = `<span class="fecha">${fmtFecha(h.creado)}</span>`;
 
-      tr.append(tdT, tdE, tdF);
+      tr.append(tdT, tdE, tdC, tdA, tdF);
       return tr;
     }
 
