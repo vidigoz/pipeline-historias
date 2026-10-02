@@ -38,7 +38,7 @@
     }
     header h1 { font-size: 1.05rem; margin: 0; font-weight: 600; }
     .version { font-size: 0.72rem; font-weight: 400; color: var(--muted); margin-left: 6px; vertical-align: middle; }
-    .wrap { max-width: 860px; margin: 0 auto; padding: 16px; }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 16px; }
     section { margin-bottom: 26px; }
     section > h2 {
       font-size: 0.95rem;
@@ -87,8 +87,13 @@
       border-radius: 12px;
       padding: 14px;
     }
-    .historias-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .historias-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
     .historias-col > h3 { font-size: 0.85rem; color: var(--muted); margin: 0 0 8px; }
+    /* Cada columna scrollea por dentro: Programado puede traer decenas de filas. */
+    .historias-col .card { max-height: 70vh; overflow-y: auto; }
+    @media (max-width: 1100px) {
+      .historias-grid { grid-template-columns: 1fr 1fr; }
+    }
     @media (max-width: 620px) {
       .historias-grid { grid-template-columns: 1fr; }
     }
@@ -170,7 +175,7 @@
 
   <div id="app" hidden>
     <header>
-      <h1>Panel del Pipeline <span class="version">v1.0.3</span></h1>
+      <h1>Panel del Pipeline <span class="version">v1.0.4</span></h1>
       <button id="logout">Salir</button>
     </header>
 
@@ -222,6 +227,30 @@
               </table>
             </div>
           </div>
+          <div class="historias-col">
+            <h3>Programadas</h3>
+            <div class="card" id="programadas-card">
+              <p class="muted" id="programadas-loading">Cargando…</p>
+              <table id="programadas-tabla" hidden>
+                <thead>
+                  <tr><th>Título</th><th>Estado</th><th>Categoría</th><th>Antigüedad</th><th>Creada</th></tr>
+                </thead>
+                <tbody id="programadas-body"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="historias-col">
+            <h3>Carrusel</h3>
+            <div class="card" id="carrusel-card">
+              <p class="muted" id="carrusel-loading">Cargando…</p>
+              <table id="carrusel-tabla" hidden>
+                <thead>
+                  <tr><th>Título</th><th>Estado</th><th>Categoría</th><th>Antigüedad</th><th>Creada</th></tr>
+                </thead>
+                <tbody id="carrusel-body"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -234,11 +263,16 @@
     const KEY = 'vidigoz_dash_pw';
     let PW = sessionStorage.getItem(KEY) || '';
 
-    // Dos estados que se muestran: historias generadas esperando revisión
-    // manual (subir imagen y pasar a "Listo" a mano), y las que ya quedaron
-    // en "Listo".
-    const ESTADO_REVISION = 'Revision';
-    const ESTADO_LISTO = 'Listo';
+    // Las 4 listas del panel. Cada columna define su propio predicado sobre
+    // una historia: las tres primeras filtran por Estado y la de Carrusel por
+    // el checkbox "Carrusel" (por eso puede repetir historias que ya salen en
+    // Programado — es una vista distinta del mismo panorama).
+    const COLUMNAS = [
+      { clave: 'revision',    filtrar: (h) => h.estado === 'Revision',   mensajeVacio: 'No hay historias esperando tu revisión.' },
+      { clave: 'listas',      filtrar: (h) => h.estado === 'Listo',      mensajeVacio: 'No hay historias listas todavía.' },
+      { clave: 'programadas', filtrar: (h) => h.estado === 'Programado', mensajeVacio: 'No hay historias programadas.' },
+      { clave: 'carrusel',    filtrar: (h) => h.carrusel === true,       mensajeVacio: 'No hay historias marcadas como Carrusel.' },
+    ];
 
     // Filtros activos (Categoria/Antiguedad, ambos propiedades "select" de
     // Notion) y última respuesta cruda del backend, para poder re-pintar
@@ -354,20 +388,21 @@
     });
 
     async function cargarHistorias() {
-      for (const id of ['revision-loading', 'listas-loading']) {
-        document.getElementById(id).hidden = false;
-        document.getElementById(id).textContent = 'Cargando…';
+      for (const col of COLUMNAS) {
+        const loading = document.getElementById(col.clave + '-loading');
+        loading.hidden = false;
+        loading.textContent = 'Cargando…';
+        document.getElementById(col.clave + '-tabla').hidden = true;
       }
-      document.getElementById('revision-tabla').hidden = true;
-      document.getElementById('listas-tabla').hidden = true;
       try {
         const r = await api('listar-historias');
         ultimasHistorias = r.historias;
         poblarOpcionesFiltro(r.opciones);
         pintarListas();
       } catch (e) {
-        document.getElementById('revision-loading').textContent = 'Error: ' + e.message;
-        document.getElementById('listas-loading').textContent = 'Error: ' + e.message;
+        for (const col of COLUMNAS) {
+          document.getElementById(col.clave + '-loading').textContent = 'Error: ' + e.message;
+        }
       }
     }
 
@@ -399,25 +434,20 @@
           && (filtroAntiguedad === 'all' || h.antiguedad === filtroAntiguedad);
     }
 
-    // Pinta ambas listas a partir de `ultimasHistorias`, sin volver a pedir
+    // Pinta las 4 listas a partir de `ultimasHistorias`, sin volver a pedir
     // datos a Notion (se usa tanto al cargar como al cambiar un filtro).
     function pintarListas() {
-      renderLista(ESTADO_REVISION, {
-        tbodyId: 'revision-body',
-        tablaId: 'revision-tabla',
-        loadingId: 'revision-loading',
-        mensajeVacio: 'No hay historias esperando tu revisión.',
-      });
-      renderLista(ESTADO_LISTO, {
-        tbodyId: 'listas-body',
-        tablaId: 'listas-tabla',
-        loadingId: 'listas-loading',
-        mensajeVacio: 'No hay historias listas todavía.',
-      });
+      for (const col of COLUMNAS) {
+        renderLista(col, {
+          tbodyId: col.clave + '-body',
+          tablaId: col.clave + '-tabla',
+          loadingId: col.clave + '-loading',
+        });
+      }
     }
 
-    function renderLista(estado, { tbodyId, tablaId, loadingId, mensajeVacio }) {
-      const historias = ultimasHistorias.filter((h) => h.estado === estado && pasaFiltros(h));
+    function renderLista({ filtrar, mensajeVacio }, { tbodyId, tablaId, loadingId }) {
+      const historias = ultimasHistorias.filter((h) => filtrar(h) && pasaFiltros(h));
       const body = document.getElementById(tbodyId);
       const tabla = document.getElementById(tablaId);
       const loading = document.getElementById(loadingId);

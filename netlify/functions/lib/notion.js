@@ -47,21 +47,24 @@ async function crearHistoriaCompleta({ titulo, historia, promptImagen, category,
   return res.json();
 }
 
-// Estados que le interesan al dashboard (las demás, p.ej. Programado/
-// Cancelado/Previo, no se muestran nunca en el panel).
-const ESTADOS_DASHBOARD = ['Revision', 'Listo'];
+// Estados que le interesan al dashboard (Cancelado/Previo no se muestran
+// nunca). Además de estos, la lista también incluye cualquier historia con el
+// checkbox "Carrusel" palomeado, aunque su Estado no esté aquí: la columna
+// Carrusel del panel filtra por ese checkbox, no por Estado.
+const ESTADOS_DASHBOARD = ['Revision', 'Listo', 'Programado'];
 
 // Lista historias de vidiclip_db para el dashboard: título, estado,
-// categoría, antigüedad y fecha de creación (created_time nativo de Notion).
+// categoría, antigüedad, checkbox Carrusel y fecha de creación (created_time
+// nativo de Notion).
 //
-// Filtramos por Estado directamente en Notion (en vez de traer un top-N y
-// filtrar en el cliente) porque la base ya tiene cientos de historias en
-// otros estados (Programado, Cancelado, Previo) que nunca se muestran; sin
-// este filtro, un límite fijo de página podía dejar fuera historias
-// recientes en Revision/Listo simplemente porque había muchas de otros
-// estados por delante en el orden de creación. Se pagina hasta traer todas
-// las que matchean, así el filtro de Antigüedad/Categoria en el frontend
-// siempre tiene el conjunto completo disponible.
+// Filtramos en Notion (en vez de traer un top-N y filtrar en el cliente)
+// porque la base tiene cientos de historias en estados que no se muestran
+// (Cancelado, Previo); sin este filtro, un límite fijo de página podía dejar
+// fuera historias recientes de Revision/Listo/Programado simplemente porque
+// había muchas de otros estados por delante en el orden de creación. Se
+// pagina hasta traer todas las que matchean, así el filtro de
+// Antigüedad/Categoria en el frontend siempre tiene el conjunto completo
+// disponible.
 async function listarHistorias() {
   const historias = [];
   let cursor;
@@ -71,7 +74,13 @@ async function listarHistorias() {
       headers: headers(),
       body: JSON.stringify({
         filter: {
-          or: ESTADOS_DASHBOARD.map((estado) => ({ property: 'Estado', status: { equals: estado } })),
+          or: [
+            ...ESTADOS_DASHBOARD.map((estado) => ({ property: 'Estado', status: { equals: estado } })),
+            // La columna Carrusel del panel filtra por este checkbox, no por
+            // Estado: traemos también las palomeadas cuyo Estado no esté en
+            // ESTADOS_DASHBOARD para que igual aparezcan en esa columna.
+            { property: 'Carrusel', checkbox: { equals: true } },
+          ],
         },
         sorts: [{ timestamp: 'created_time', direction: 'descending' }],
         page_size: 100,
@@ -88,6 +97,7 @@ async function listarHistorias() {
         estado: page.properties['Estado']?.status?.name || '(sin estado)',
         categoria: page.properties['Category']?.select?.name || null,
         antiguedad: page.properties['Antiguedad']?.select?.name || null,
+        carrusel: !!page.properties['Carrusel']?.checkbox,
         creado: page.created_time,
       });
     }
