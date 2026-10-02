@@ -48,14 +48,15 @@ async function crearHistoriaCompleta({ titulo, historia, promptImagen, category,
 }
 
 // Estados que le interesan al dashboard (Cancelado/Previo no se muestran
-// nunca). Además de estos, la lista también incluye cualquier historia con el
-// checkbox "Carrusel" palomeado, aunque su Estado no esté aquí: la columna
-// Carrusel del panel filtra por ese checkbox, no por Estado.
+// nunca). Además de estos, la lista también incluye cualquier historia con
+// alguno de los checkboxes "Carrusel" o "Lista para carrusel" palomeado,
+// aunque su Estado no esté aquí: las columnas Carrusel y Listas para carrusel
+// del panel filtran por esos checkboxes, no por Estado.
 const ESTADOS_DASHBOARD = ['Revision', 'Listo', 'Programado'];
 
 // Lista historias de vidiclip_db para el dashboard: título, estado,
-// categoría, antigüedad, checkbox Carrusel y fecha de creación (created_time
-// nativo de Notion).
+// categoría, antigüedad, checkboxes Carrusel / Lista para carrusel y fecha de
+// creación (created_time nativo de Notion).
 //
 // Filtramos en Notion (en vez de traer un top-N y filtrar en el cliente)
 // porque la base tiene cientos de historias en estados que no se muestran
@@ -76,10 +77,12 @@ async function listarHistorias() {
         filter: {
           or: [
             ...ESTADOS_DASHBOARD.map((estado) => ({ property: 'Estado', status: { equals: estado } })),
-            // La columna Carrusel del panel filtra por este checkbox, no por
-            // Estado: traemos también las palomeadas cuyo Estado no esté en
-            // ESTADOS_DASHBOARD para que igual aparezcan en esa columna.
+            // Las columnas Carrusel y Listas para carrusel del panel filtran
+            // por sus checkboxes, no por Estado: traemos también las
+            // palomeadas cuyo Estado no esté en ESTADOS_DASHBOARD para que
+            // igual aparezcan en esas columnas.
             { property: 'Carrusel', checkbox: { equals: true } },
+            { property: 'Lista para carrusel', checkbox: { equals: true } },
           ],
         },
         sorts: [{ timestamp: 'created_time', direction: 'descending' }],
@@ -98,6 +101,7 @@ async function listarHistorias() {
         categoria: page.properties['Category']?.select?.name || null,
         antiguedad: page.properties['Antiguedad']?.select?.name || null,
         carrusel: !!page.properties['Carrusel']?.checkbox,
+        listaCarrusel: !!page.properties['Lista para carrusel']?.checkbox,
         creado: page.created_time,
       });
     }
