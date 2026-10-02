@@ -141,17 +141,7 @@
       color: var(--text);
       margin: 12px 0;
     }
-    .banner {
-      padding: 10px 14px;
-      border-radius: 8px;
-      margin-bottom: 14px;
-      font-size: 0.9rem;
-      display: none;
-    }
-    .banner.ok { background: rgba(63,185,107,0.15); color: var(--ok); display: block; }
-    .banner.err { background: rgba(225,91,91,0.15); color: var(--err); display: block; }
     .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .hint { color: var(--muted); font-size: 0.8rem; margin: 4px 0 0; }
     @media (max-width: 620px) {
       thead { display: none; }
       table, tbody, tr, td { display: block; width: 100%; }
@@ -175,23 +165,12 @@
 
   <div id="app" hidden>
     <header>
-      <h1>Panel del Pipeline <span class="version">v1.0.4</span></h1>
+      <h1>Panel del Pipeline <span class="version">v1.0.5</span></h1>
       <button id="logout">Salir</button>
     </header>
 
     <div class="wrap">
-      <div class="banner" id="banner"></div>
-
-      <!-- 1. Generar historias -->
-      <section>
-        <div class="row-actions">
-          <button class="primary big" id="gen-tragedias-btn">⚔️ Generar Tragedia</button>
-          <button class="primary big" id="gen-comedias-btn">🍺 Generar Comedia</button>
-        </div>
-        <p class="hint">Genera 1 historia completa (texto, prompt de imagen, oficio, año, lugar, sopa) y la publica en Notion con Estado "Revision". Dale click varias veces para generar más de una.</p>
-      </section>
-
-      <!-- 2. Panel de historias -->
+      <!-- Panel de historias -->
       <section>
         <h2>Historias <button id="refresh" style="font-size:0.78rem;padding:4px 10px;">↻ Actualizar</button></h2>
         <div class="row-actions" style="margin-bottom:14px;">
@@ -297,13 +276,6 @@
       return data;
     }
 
-    function banner(msg, tipo) {
-      const b = document.getElementById('banner');
-      b.textContent = msg;
-      b.className = 'banner ' + tipo;
-      if (tipo === 'ok') setTimeout(() => { b.className = 'banner'; }, 5000);
-    }
-
     function fmtFecha(iso) {
       if (!iso) return '—';
       try {
@@ -354,29 +326,7 @@
       }
     }
 
-    // ---- 1. Generar historias ----
-    async function generar(endpoint, btn, etiqueta) {
-      btn.disabled = true;
-      const orig = btn.textContent;
-      btn.textContent = 'Generando… (puede tardar ~1-2 min)';
-      try {
-        const r = await api(endpoint);
-        let msg = `Se crearon ${r.creadas.length} historia(s) de ${etiqueta}.`;
-        if (r.errores && r.errores.length) {
-          msg += ` Fallaron ${r.errores.length}: ${r.errores.map(e => e.titulo).join(', ')}`;
-        }
-        banner(msg, (r.errores && r.errores.length) ? 'err' : 'ok');
-        cargarHistorias();
-      } catch (e) {
-        banner('Error al generar: ' + e.message, 'err');
-      } finally {
-        btn.disabled = false; btn.textContent = orig;
-      }
-    }
-    document.getElementById('gen-tragedias-btn').addEventListener('click', (e) => generar('generar-tragedias', e.currentTarget, 'tragedia'));
-    document.getElementById('gen-comedias-btn').addEventListener('click', (e) => generar('generar-comedias', e.currentTarget, 'comedia'));
-
-    // ---- 2. Historias ----
+    // ---- Historias ----
     document.getElementById('refresh').addEventListener('click', cargarHistorias);
     document.getElementById('filtro-categoria').addEventListener('change', (e) => {
       filtroCategoria = e.target.value;
