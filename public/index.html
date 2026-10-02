@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Panel — Pipeline de Historias VidiGozTV</title>
+  <title>PipeLine de Historias vidigozTV</title>
+  <link rel="icon" type="image/png" href="/icons/favicon.png" />
+  <link rel="apple-touch-icon" href="/icons/favicon.png" />
   <style>
     :root {
       --bg: #14161a;
@@ -38,6 +40,8 @@
     }
     header h1 { font-size: 1.05rem; margin: 0; font-weight: 600; }
     .version { font-size: 0.72rem; font-weight: 400; color: var(--muted); margin-left: 6px; vertical-align: middle; }
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .logo { height: 46px; width: auto; max-width: 130px; object-fit: contain; border-radius: 8px; display: block; flex: 0 0 auto; }
     .wrap { max-width: 1400px; margin: 0 auto; padding: 16px; }
     section { margin-bottom: 26px; }
     section > h2 {
@@ -165,7 +169,10 @@
 
   <div id="app" hidden>
     <header>
-      <h1>Panel del Pipeline <span class="version">v1.0.5</span></h1>
+      <div class="brand">
+        <img class="logo" src="/icons/icon.png" alt="VidiGozTV" />
+        <h1>PipeLine de Historias vidigozTV <span class="version">v1.0.6</span></h1>
+      </div>
       <button id="logout">Salir</button>
     </header>
 
