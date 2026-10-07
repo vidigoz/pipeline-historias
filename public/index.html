@@ -186,7 +186,7 @@
     <header>
       <div class="brand">
         <img class="logo" src="/icons/icon.png" alt="VidiGozTV" />
-        <h1>PipeLine de Historias vidigozTV <span class="version">v1.0.7</span></h1>
+        <h1>PipeLine de Historias vidigozTV <span class="version">v1.0.8</span></h1>
       </div>
       <button id="logout">Salir</button>
     </header>
@@ -259,10 +259,26 @@
     const COLUMNAS = [
       { clave: 'revision',       filtrar: (h) => h.estado === 'Revision',   mensajeVacio: 'No hay historias esperando tu revisión.' },
       { clave: 'listas',         filtrar: (h) => h.estado === 'Listo',      mensajeVacio: 'No hay historias listas todavía.' },
-      { clave: 'programadas',    filtrar: (h) => h.estado === 'Programado', mensajeVacio: 'No hay historias programadas.' },
+      { clave: 'programadas',
+        filtrar: (h) => h.estado === 'Programado',
+        ordenar: (a, b) => cmpFechaDesc(a.fechaPublicacion, b.fechaPublicacion),
+        mostrarPublicacion: true,
+        mensajeVacio: 'No hay historias programadas.' },
       { clave: 'lista-carrusel', filtrar: (h) => h.listaCarrusel === true,  mensajeVacio: 'No hay historias marcadas como Lista para carrusel.' },
       { clave: 'carrusel',       filtrar: (h) => h.carrusel === true,       mensajeVacio: 'No hay historias marcadas como Carrusel.' },
     ];
+
+    // Ordena por fecha descendente (la más reciente primero). Las historias sin
+    // fecha (p. ej. una Programada a la que todavía no le pusieron fecha de
+    // publicación) van al final, para no romper el orden de las que sí tienen.
+    function cmpFechaDesc(a, b) {
+      const ta = a ? Date.parse(a) : null;
+      const tb = b ? Date.parse(b) : null;
+      if (ta === tb) return 0;
+      if (ta === null) return 1;
+      if (tb === null) return -1;
+      return tb - ta;
+    }
 
     // Filtros activos (Categoria/Antiguedad, ambos propiedades "select" de
     // Notion) y última respuesta cruda del backend, para poder re-pintar
@@ -406,8 +422,10 @@
       }
     }
 
-    function renderLista({ filtrar, mensajeVacio }, { listaId, loadingId }) {
-      const historias = ultimasHistorias.filter((h) => filtrar(h) && pasaFiltros(h));
+    function renderLista(col, { listaId, loadingId }) {
+      const { filtrar, ordenar, mensajeVacio } = col;
+      let historias = ultimasHistorias.filter((h) => filtrar(h) && pasaFiltros(h));
+      if (ordenar) historias = historias.slice().sort(ordenar);
       const lista = document.getElementById(listaId);
       const loading = document.getElementById(loadingId);
 
@@ -419,7 +437,7 @@
         return;
       }
       for (const h of historias) {
-        lista.appendChild(itemHistoria(h));
+        lista.appendChild(itemHistoria(h, col));
       }
       loading.hidden = true;
       lista.hidden = false;
@@ -427,8 +445,10 @@
 
     // Una historia como tarjeta: el título es un link a la página de Notion y
     // debajo va una línea de subtítulos informativos (Estado, Categoría,
-    // Antigüedad y fecha de creación).
-    function itemHistoria(h) {
+    // Antigüedad y fecha de creación). En las columnas que lo piden (p. ej.
+    // Programadas, que se ordena por esta fecha) se agrega además la fecha de
+    // publicación/programación.
+    function itemHistoria(h, col) {
       const li = document.createElement('li');
       li.className = 'hist-item';
 
@@ -459,6 +479,14 @@
       fecha.textContent = fmtFecha(h.creado);
 
       meta.append(estado, categoria, antiguedad, fecha);
+
+      if (col && col.mostrarPublicacion && h.fechaPublicacion) {
+        const pub = document.createElement('span');
+        pub.className = 'fecha';
+        pub.textContent = '🗓 ' + fmtFecha(h.fechaPublicacion);
+        meta.append(pub);
+      }
+
       li.append(titulo, meta);
       return li;
     }

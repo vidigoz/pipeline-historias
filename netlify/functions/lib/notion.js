@@ -55,7 +55,8 @@ async function crearHistoriaCompleta({ titulo, historia, promptImagen, category,
 const ESTADOS_DASHBOARD = ['Revision', 'Listo', 'Programado'];
 
 // Lista historias de vidiclip_db para el dashboard: título, estado,
-// categoría, antigüedad, checkboxes Carrusel / Lista para carrusel y fecha de
+// categoría, antigüedad, checkboxes Carrusel / Lista para carrusel, la fecha
+// de publicación/programación (propiedad date de Notion) y la fecha de
 // creación (created_time nativo de Notion).
 //
 // Filtramos en Notion (en vez de traer un top-N y filtrar en el cliente)
@@ -103,6 +104,7 @@ async function listarHistorias() {
         carrusel: !!page.properties['Carrusel']?.checkbox,
         listaCarrusel: !!page.properties['Lista para carrusel']?.checkbox,
         creado: page.created_time,
+        fechaPublicacion: page.properties['Fecha de Publicacion']?.date?.start || null,
       });
     }
     cursor = data.has_more ? data.next_cursor : undefined;
